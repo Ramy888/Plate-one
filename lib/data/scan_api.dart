@@ -115,6 +115,20 @@ class ScanApi {
     return ChatReply.fromJson(_decode(response));
   }
 
+  /// Mints a short-lived token for one voice conversation.
+  ///
+  /// A browser cannot put an `Authorization` header on a WebSocket, so the
+  /// AssemblyAI key stays on the server and this is what the client connects
+  /// with. The token is redeemable for a couple of minutes and buys exactly
+  /// one session — fetch a fresh one immediately before every connect.
+  Future<VoiceToken> voiceToken(String deviceToken) async {
+    final response = await _send(
+      () => _client.post(_uri('/v1/voice/token'), headers: _auth(deviceToken)),
+      timeout: const Duration(seconds: 20),
+    );
+    return VoiceToken.fromJson(_decode(response));
+  }
+
   /// Downloads a generated preview. Kept on the device only.
   Future<Uint8List> previewImage({
     required String deviceToken,
@@ -218,8 +232,7 @@ enum ScanError {
         'preview_unavailable' => ScanError.busy,
         'preview_expired' => ScanError.previewExpired,
         'invalid_addition' || 'invalid_food' => ScanError.imageRejected,
-        'sign_in_unavailable' => ScanError.busy,
-        'chat_unavailable' => ScanError.busy,
+        'voice_unavailable' || 'voice_unconfigured' => ScanError.busy,
         'invalid_field' => ScanError.imageRejected,
         'recognition_busy' => ScanError.busy,
         'rate_limited' => ScanError.rateLimited,
@@ -261,28 +274,68 @@ class ScanQuota {
   const ScanQuota({
     required this.scans,
     required this.previews,
+    required this.voice,
     required this.resetsAt,
   });
 
   /// What is left today, not what has been spent.
   final int scans;
   final int previews;
+
+  /// Conversations. The most generous of the three, because it is the product.
+  final int voice;
   final DateTime resetsAt;
 
   /// Before the device has ever registered.
   static final unknown = ScanQuota(
     scans: 0,
     previews: 0,
+    voice: 0,
     resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
   );
 
   bool get hasScans => scans > 0;
+  bool get hasVoice => voice > 0;
 
   factory ScanQuota.fromJson(Map<String, dynamic> json) => ScanQuota(
         scans: (json['scans'] as num?)?.toInt() ?? 0,
         previews: (json['previews'] as num?)?.toInt() ?? 0,
+        voice: (json['voice'] as num?)?.toInt() ?? 0,
         resetsAt: DateTime.fromMillisecondsSinceEpoch(
           ((json['resetsAt'] as num?)?.toInt() ?? 0) * 1000,
+        ),
+      );
+}
+
+/// Permission to hold one conversation.
+class VoiceToken {
+  const VoiceToken({
+    required this.token,
+    required this.expiresAt,
+    required this.maxSessionSeconds,
+    required this.quota,
+  });
+
+  /// Goes in the WebSocket URL. Never logged, never stored.
+  final String token;
+
+  /// After this, connecting fails and a new token is needed.
+  final DateTime expiresAt;
+
+  /// The server caps the session at this. The client runs the same clock, so
+  /// a forgotten tab stops costing money before the server has to cut it off.
+  final int maxSessionSeconds;
+
+  final ScanQuota quota;
+
+  factory VoiceToken.fromJson(Map<String, dynamic> json) => VoiceToken(
+        token: json['token'] as String? ?? '',
+        expiresAt: DateTime.fromMillisecondsSinceEpoch(
+          ((json['expiresAt'] as num?)?.toInt() ?? 0) * 1000,
+        ),
+        maxSessionSeconds: (json['maxSessionSeconds'] as num?)?.toInt() ?? 600,
+        quota: ScanQuota.fromJson(
+          (json['quota'] as Map<String, dynamic>?) ?? const {},
         ),
       );
 }

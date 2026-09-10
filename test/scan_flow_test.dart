@@ -72,8 +72,19 @@ class FakeScanApi implements ScanApi {
   ScanQuota quotaValue = ScanQuota(
     scans: 4,
     previews: 2,
+    voice: 9,
     resetsAt: DateTime.fromMillisecondsSinceEpoch(1789310995000),
   );
+
+  /// Voice never goes near this fake — the session takes a minting function,
+  /// not an API — but the interface has to be whole.
+  @override
+  Future<VoiceToken> voiceToken(String deviceToken) async => VoiceToken(
+        token: 'fake-voice-token',
+        expiresAt: DateTime.fromMillisecondsSinceEpoch(1789310995000),
+        maxSessionSeconds: 600,
+        quota: quotaValue,
+      );
 
   @override
   Future<ChatReply> plate({

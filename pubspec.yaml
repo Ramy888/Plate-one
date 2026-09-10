@@ -22,8 +22,11 @@ dependencies:
   lucide_icons_flutter: ^3.1.19
   record: ^6.2.1
   path_provider: ^2.1.6
+  web: ^1.1.1
 
 dev_dependencies:
+  # Only the voice session test needs it, to stand in for a WebSocket.
+  stream_channel: ^2.1.4
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
