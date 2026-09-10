@@ -19,7 +19,7 @@ on top of it.
 | `POST` | `/v1/scan` | Recognise a meal photo |
 | `POST` | `/v1/preview` | Draw the photographed meal with one addition on it |
 | `GET` | `/v1/preview/{id}.jpg` | Serve a generated picture |
-| `POST` | `/v1/plate` | Write up and draw a plate the engine chose. Ids in, never words |
+| `POST` | `/v1/plate` | Write up and draw a plate. Ids in, never words. Addition optional |
 | `POST` | `/v1/voice/token` | Mint a single-use AssemblyAI Voice Agent token |
 | `POST` | `/v1/report` | Report an AI result |
 
@@ -31,7 +31,7 @@ the URL and talks. Two limits stand behind that.
 
 | | Conversations | Scans | Pictures | Window |
 |---|---|---|---|---|
-| Per device | 12 | 8 | 4 | per day |
+| Per device | 12 | 8 | 30 | per day |
 | Whole deployment | `GLOBAL_CALLS_PER_DAY` (2000), across all three | | | per day |
 
 Voice is the most generous because it is the product; the other two support it.
@@ -68,6 +68,21 @@ time, far from the cause, so there is a test pinning it.
 Tokens are short-lived (120 s to redeem) and the session is capped at 10 minutes.
 AssemblyAI's own default cap is three hours, which is three hours of billing for
 a tab someone left open.
+
+**The same plate is only drawn once.** A picture is stored under a key derived
+from the sorted food ids and the addition, so asking for the same plate again
+is a lookup — no model, no wait, no allowance spent. This is what makes the
+voice screen affordable: the meal is redrawn as the conversation fills it in,
+and someone flipping between three suggestions would otherwise pay for the same
+picture every time they flipped back. `worker/test/plate.test.ts` proves it by
+registering exactly one image stub and asking twice.
+
+Sorting matters: "rice and chicken" and "chicken and rice" are one meal.
+
+**An addition is optional.** `/v1/plate` with no `additionId` draws the meal
+alone, which is what the plate shows while the conversation is still going. The
+id is still checked when one is sent — that check is what keeps free text away
+from the image model, and it did not become optional.
 
 **A refused model call is refunded.** If Gemini or AssemblyAI errors after the
 allowance was taken, the unit goes back. The user should not pay for our failure.
@@ -121,7 +136,7 @@ npx wrangler r2 bucket create plateone-previews
 cp ../.env.example .dev.vars             # then fill it in
 npm run migrate:local
 npm run dev
-npx vitest run                           # 82 tests
+npx vitest run                           # 88 tests
 ```
 
 The R2 bucket wants a lifecycle rule deleting anything under `p/` after 24

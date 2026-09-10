@@ -176,18 +176,24 @@ export async function postPreview(request: Request, env: Env): Promise<Response>
 }
 
 /**
- * Serves a generated preview.
+ * Serves a generated picture.
  *
- * The bucket has no public access, so this is the only way to read one. The key
- * is an unguessable UUID and the object disappears within 24 hours; a signed
- * URL would add ceremony without adding much, since the device token is already
- * required.
+ * The bucket has no public access, so this is the only way to read one, and the
+ * object disappears within 24 hours. Two kinds of name arrive here:
+ *
+ * - `<uuid>.jpg` — a preview of someone's **own photograph** with an addition
+ *   drawn onto it. Unguessable, and it must stay that way: the photo is theirs.
+ * - `plate-<hash>.jpg` — a generated plate, named after the catalogue ids it
+ *   was drawn from. Deliberately guessable, because that is what makes it a
+ *   cache. There is nothing personal in one: it is a stock picture of rice and
+ *   chicken, identical for everyone who describes that meal, and reading it
+ *   still needs a device token.
  */
 export async function getPreview(request: Request, env: Env): Promise<Response> {
   await authenticateDevice(request, env, now());
 
   const name = new URL(request.url).pathname.split('/').pop() ?? '';
-  if (!/^[0-9a-f-]{36}\.jpg$/.test(name)) {
+  if (!/^([0-9a-f-]{36}|plate-[0-9a-f]{32})\.jpg$/.test(name)) {
     throw new ApiError(400, 'bad_key', 'Not a preview.');
   }
 

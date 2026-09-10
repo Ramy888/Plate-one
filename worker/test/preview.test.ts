@@ -124,7 +124,7 @@ describe('generating a preview', () => {
     expect(body.previewUrl).toContain('/v1/preview/');
     expect(body.disclaimer).toBe(PREVIEW_DISCLAIMER);
     expect(body.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
-    expect(body.quota.previews).toBe(3);
+    expect(body.quota.previews).toBe(Number(env.PREVIEWS_PER_DAY) - 1);
   });
 
   it('stores the image with its disclaimer attached', async () => {
@@ -158,10 +158,12 @@ describe('who can generate one', () => {
     async () => {
       const token = await register();
       const stub = await quotaStub(token);
-      // Spend all but one, so the test does not have to buy four pictures.
+      // Spend all but one, so the test buys a single picture rather than the
+      // whole day's worth.
       await runInDurableObject(stub, async (instance: QuotaCounter) => {
         const t = Math.floor(Date.now() / 1000);
-        for (let i = 0; i < 3; i++) await instance.spend('preview', t);
+        const limit = Number(env.PREVIEWS_PER_DAY);
+        for (let i = 0; i < limit - 1; i++) await instance.spend('preview', t);
       });
 
       interceptImage(imageReply, 200, 1);
@@ -197,7 +199,8 @@ describe('who can generate one', () => {
     const stub = await quotaStub(token);
     await runInDurableObject(stub, async (instance: QuotaCounter) => {
       const t = Math.floor(Date.now() / 1000);
-      for (let i = 0; i < 4; i++) await instance.spend('preview', t);
+      const limit = Number(env.PREVIEWS_PER_DAY);
+      for (let i = 0; i < limit; i++) await instance.spend('preview', t);
     });
 
     const response = await send(previewRequest(token));
@@ -249,7 +252,9 @@ describe('when generation fails', () => {
     expect(body.message).toContain('unchanged');
 
     await runInDurableObject(stub, async (instance: QuotaCounter) => {
-      expect((await instance.peek(Math.floor(Date.now() / 1000))).previews).toBe(4);
+      expect((await instance.peek(Math.floor(Date.now() / 1000))).previews).toBe(
+        Number(env.PREVIEWS_PER_DAY),
+      );
     });
   });
 
@@ -263,7 +268,9 @@ describe('when generation fails', () => {
     expect((await response.json() as { error: string }).error).toBe('preview_blocked');
 
     await runInDurableObject(stub, async (instance: QuotaCounter) => {
-      expect((await instance.peek(Math.floor(Date.now() / 1000))).previews).toBe(4);
+      expect((await instance.peek(Math.floor(Date.now() / 1000))).previews).toBe(
+        Number(env.PREVIEWS_PER_DAY),
+      );
     });
   });
 

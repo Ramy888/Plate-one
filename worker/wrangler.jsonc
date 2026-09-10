@@ -71,7 +71,11 @@
     // a monetisation lever. Voice is the most generous because it is the
     // product; the other two are supporting features.
     "SCANS_PER_DAY": "8",
-    "PREVIEWS_PER_DAY": "4",
+    // Pictures. The voice screen redraws the plate as the meal fills in and
+    // again for each suggestion tried, so one conversation is several — far
+    // more than the photo-editing preview ever needed. Repeats are free: the
+    // same plate is cached under a key derived from its contents.
+    "PREVIEWS_PER_DAY": "30",
     "VOICE_SESSIONS_PER_DAY": "12",
 
     // Across every device, per day. The number that actually protects the

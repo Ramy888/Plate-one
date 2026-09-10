@@ -85,11 +85,14 @@ Return only the edited photograph.`;
  * user typed appears here, and there is no interpolation point where it could:
  * the model hands back ids, and ids are all this function accepts.
  */
-export function plateImagePrompt(foodNames: string[], additionPhrase: string): string {
+export function plateImagePrompt(foodNames: string[], additionPhrase: string | null): string {
   const plate = foodNames.length > 0 ? foodNames.join(', ') : 'a simple everyday meal';
+  // With no addition this is a picture of the meal as described, which is what
+  // the plate on the voice screen shows while the conversation is still going.
+  const added = additionPhrase ? `, with ${additionPhrase} added to the side` : '';
   return (
-    `A top-down photograph of a plate of ${plate}, with ${additionPhrase} added ` +
-    `to the side. Natural daylight, plain background, appetising home cooking, ` +
+    `A top-down photograph of a plate of ${plate}${added}. ` +
+    `Natural daylight, plain background, appetising home cooking, ` +
     `no text, no people, no hands.`
   );
 }

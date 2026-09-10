@@ -100,7 +100,13 @@ describe('device registration', () => {
   it('issues a token and a free allowance', async () => {
     const { deviceToken, quota } = await register();
     expect(deviceToken).toBeTruthy();
-    expect(quota).toMatchObject({ scans: 8, previews: 4 });
+    // Read from the binding, not repeated: the numbers are a deployment
+    // decision and a test that hard-codes them fails for the wrong reason
+    // every time one is tuned.
+    expect(quota).toMatchObject({
+      scans: Number(env.SCANS_PER_DAY),
+      previews: Number(env.PREVIEWS_PER_DAY),
+    });
   });
 
   it('stores only a hash of the token', async () => {
