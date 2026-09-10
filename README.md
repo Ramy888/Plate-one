@@ -11,6 +11,21 @@ boiled egg, a scoop of hummus, a side salad — and tells you why.
 Built on the **AssemblyAI Voice Agent API** for the lablab.ai Voice Agent
 Hackathon.
 
+## Status — 10 September 2026
+
+Honest, because a README that describes a feature before it exists is worth no
+more than one that omits a feature that does.
+
+- **Landed:** the recommendation engine, the catalogue, the screens for building
+  a plate by hand, photo recognition, the drawn plate, the Worker with its
+  per-device allowance and deployment-wide budget cap. 194 + 65 tests.
+- **Next:** the voice session itself. Everything below describing a spoken
+  conversation is the design being built toward, not something you can do today.
+- **Being established:** how a browser authenticates the Voice Agent WebSocket.
+  A browser cannot set an `Authorization` header on one, so this is either a
+  short-lived token or a Worker-side proxy — settled against the live API before
+  any of it is written, not guessed at here.
+
 ---
 
 ## The idea worth stealing
@@ -33,7 +48,7 @@ language model asked to give nutrition advice will invent some — confidently,
 fluently, differently each time. This one cannot: the only additions it can
 name are the ones the engine returned.
 
-## How it works
+## How it works — the design
 
 1. Say what is on the plate. Rough is fine — "rice and some chicken".
 2. The agent resolves what it heard against a closed catalogue of 51 foods, and
@@ -85,9 +100,11 @@ daily allowance, and the deployment as a whole has a hard daily ceiling on top
 of it (`GLOBAL_CALLS_PER_DAY`). When the ceiling is reached the app says so in
 plain words and falls back to the offline path, which never touches a Worker.
 
-**No key ever ships to the client.** The Worker holds them and hands out
-short-lived access; `worker/src/budget.ts` is the thing standing between a
-public demo URL and an empty API account, and it has a test that drains it.
+**No key will ever ship to the client.** The Worker holds them, and the voice
+session will reach AssemblyAI through it rather than around it — by whichever of
+the two mechanisms above turns out to exist. `worker/src/budget.ts` is the thing
+standing between a public demo URL and an empty API account, and it has a test
+that drains it.
 
 **No user text ever reaches the image model.** The language model may only reply
 with ids from the app's own closed catalogue; the Worker resolves those ids to

@@ -428,9 +428,9 @@ void main() {
     });
 
     testWidgets('nothing sells anything', (tester) async {
-      // There is no paid tier and no account. If any of these ever reappear it
-      // is a regression, not a feature — a judge opening the demo URL must
-      // reach the agent without being asked for money or a sign-in.
+      // There is no paid tier and no account, and there is not going to be.
+      // Anyone opening the URL must reach the agent without being asked for
+      // money or a sign-in, so this pins the absence rather than trusting it.
       await _pumpApp(tester, prefs: {'onboarded': true}, home: const SettingsScreen());
       for (final word in [
         'Free plan',
