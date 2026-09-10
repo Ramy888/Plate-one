@@ -9,11 +9,23 @@ import '../theme.dart';
 /// Both are driven by one controller — a single gesture should read as a single
 /// piece of movement, not two effects that happen to fire together.
 class MicButton extends StatefulWidget {
-  const MicButton({super.key, required this.onTap, this.size = 68, this.tooltip});
+  const MicButton({
+    super.key,
+    required this.onTap,
+    this.size = 68,
+    this.tooltip,
+    this.listening = false,
+  });
 
   final VoidCallback onTap;
   final double size;
   final String? tooltip;
+
+  /// While a conversation is open the button ends it rather than starting one,
+  /// so the icon and the label change with it. A microphone that still says
+  /// "speak" while it is already listening is a button nobody will press to
+  /// stop.
+  final bool listening;
 
   @override
   State<MicButton> createState() => _MicButtonState();
@@ -62,7 +74,7 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
 
     return Semantics(
       button: true,
-      label: widget.tooltip ?? 'Speak your meal',
+      label: widget.tooltip ?? (widget.listening ? 'End the conversation' : 'Speak your meal'),
       child: SizedBox(
         width: extent,
         height: extent,
@@ -86,7 +98,7 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
             );
           },
           child: Material(
-            color: PlateColors.green,
+            color: widget.listening ? PlateColors.warn : PlateColors.green,
             shape: const CircleBorder(),
             elevation: 0,
             child: InkWell(
@@ -96,7 +108,7 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
                 width: widget.size,
                 height: widget.size,
                 child: Icon(
-                  LucideIcons.mic,
+                  widget.listening ? LucideIcons.square : LucideIcons.mic,
                   size: widget.size * 0.42,
                   color: PlateColors.neutral100,
                 ),

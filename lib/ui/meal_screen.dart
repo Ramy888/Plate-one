@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -9,6 +10,8 @@ import 'saved_screen.dart';
 import 'scan_camera_screen.dart';
 import 'settings_screen.dart';
 import 'theme.dart';
+import 'voice_agent_screen.dart';
+import 'widgets/mic_button.dart';
 import 'widgets/transitions.dart';
 
 /// The hub.
@@ -89,6 +92,21 @@ class _MealScreenState extends ConsumerState<MealScreen> {
                     ),
                   ),
                 ),
+                // Voice is the front door, so it sits above the other ways in
+                // and is the only one drawn at full size.
+                //
+                // Web only, for now. The microphone works everywhere; nothing
+                // plays the agent's voice back off the web yet, and a
+                // conversation you can only talk into is worse than no button.
+                if (kIsWeb)
+                  Center(
+                    child: MicButton(
+                      tooltip: 'Say what is on your plate',
+                      onTap: () => Navigator.of(context).push(
+                        slideUpRoute(const VoiceAgentScreen()),
+                      ),
+                    ),
+                  ),
                 _WaysIn(slot: draft.slot),
                 const SizedBox(height: Space.md),
               ],

@@ -29,13 +29,34 @@ enum VoiceAgentState {
   ended,
 }
 
+/// A voice conversation, seen from the outside.
+///
+/// The screen renders from this and nothing else, so it can be driven by a
+/// fake with no socket, no microphone and no browser behind it.
+abstract class VoiceSession {
+  /// Everything the server said, in order.
+  Stream<VoiceEvent> get events;
+
+  /// The current state, and every change to it.
+  Stream<VoiceAgentState> get state;
+
+  VoiceAgentState get currentState;
+
+  /// Why it ended badly, if it did.
+  String? get failure;
+
+  Future<void> start();
+  Future<void> stop();
+  Future<void> dispose();
+}
+
 /// A voice conversation, from tap to teardown.
 ///
 /// Owns the socket, the microphone and the speaker, and hands out two streams:
 /// [events] for everything the server said, and [state] for the single word
 /// the screen shows. Every dependency is injectable because none of them exist
 /// in a test.
-class VoiceAgentSession {
+class VoiceAgentSession implements VoiceSession {
   VoiceAgentSession({
     required Future<VoiceToken> Function() mintToken,
     required this.systemPrompt,
@@ -74,16 +95,18 @@ class VoiceAgentSession {
   final _events = StreamController<VoiceEvent>.broadcast();
   final _states = StreamController<VoiceAgentState>.broadcast();
 
-  /// Everything the server said, in order.
+  @override
   Stream<VoiceEvent> get events => _events.stream;
 
-  /// The current state, and every change to it.
+  @override
   Stream<VoiceAgentState> get state => _states.stream;
 
+  @override
   VoiceAgentState get currentState => _state;
   VoiceAgentState _state = VoiceAgentState.idle;
 
   /// Set when the session ends badly, so the UI can say why.
+  @override
   String? get failure => _failure;
   String? _failure;
 
@@ -120,11 +143,16 @@ class VoiceAgentSession {
   ///
   /// The caller must have started [PcmPlayer] from a user gesture first —
   /// see [PcmPlayer.start].
+  @override
   Future<void> start() async {
     if (_state != VoiceAgentState.idle) return;
     _emitState(VoiceAgentState.connecting);
 
     try {
+      // First, and before any await: a browser only lets audio start from a
+      // user gesture, and this runs on the tap's own synchronous stack.
+      await _player.start();
+
       if (!await _mic.hasPermission()) {
         throw const VoiceFailure('Plate One needs the microphone to listen.');
       }
@@ -175,7 +203,14 @@ class VoiceAgentSession {
       // Nothing partially opened may be left running — this path has already
       // spent a device's allowance, but it must not also hold a microphone.
       await _teardown();
-      _failure = error is VoiceFailure ? error.message : 'Voice could not start.';
+      // A refusal usually arrives with something worth reading — "as many
+      // questions as it can today" beats "voice could not start", and it is
+      // the difference between a dead end and an explanation.
+      _failure = switch (error) {
+        VoiceFailure(:final message) => message,
+        ScanFailure(:final message) => message,
+        _ => 'Voice could not start.',
+      };
       _emitState(VoiceAgentState.ended);
       rethrow;
     }
@@ -186,6 +221,7 @@ class VoiceAgentSession {
   /// Sends `session.end` first: closing the socket without it leaves the
   /// session billable for another 30 seconds while the server waits for a
   /// reconnect that is not coming.
+  @override
   Future<void> stop() async {
     if (_closing || _state == VoiceAgentState.idle) return;
     _closing = true;
@@ -199,6 +235,7 @@ class VoiceAgentSession {
   }
 
   /// Releases everything and closes the streams. The object is spent.
+  @override
   Future<void> dispose() async {
     await stop();
     await _mic.dispose();

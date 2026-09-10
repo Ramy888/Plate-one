@@ -139,10 +139,11 @@ class FakeMic implements MicSource {
 class FakePlayer implements PcmPlayer {
   final played = <int>[];
   int flushes = 0;
+  bool started = false;
   bool disposed = false;
 
   @override
-  Future<void> start() async {}
+  Future<void> start() async => started = true;
 
   @override
   void enqueue(Uint8List pcm16) => played.addAll(pcm16);
@@ -270,6 +271,29 @@ void main() {
       expect(connectedTo, isEmpty);
       expect(mic.started, isFalse);
       expect(session.currentState, VoiceAgentState.ended);
+    });
+
+    test('the speaker is woken on the tap, before anything can await', () async {
+      // A browser only lets audio start from a user gesture. Waking it after
+      // the token round-trip is a coin flip; waking it here is not.
+      mic = FakeMic(permitted: false);
+      final session = build();
+      await expectLater(session.start(), throwsA(anything));
+      expect(player.started, isTrue);
+    });
+
+    test('a refusal keeps the words the server sent with it', () async {
+      // "as many questions as it can today" is an explanation. "Voice could
+      // not start" is a dead end, and the app promises never to be one.
+      final session = build(
+        mint: () async => throw const ScanFailure(
+          ScanError.quotaExhausted,
+          'Plate One has answered as many questions as it can today.',
+        ),
+      );
+
+      await expectLater(session.start(), throwsA(isA<ScanFailure>()));
+      expect(session.failure, contains('as many questions as it can today'));
     });
 
     test('a socket that never opens leaves nothing running', () async {
