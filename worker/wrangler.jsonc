@@ -68,9 +68,11 @@
     "CF_ACCOUNT_ID": "",
 
     // Per device, per day. There is no paid tier: these are spend ceilings, not
-    // a monetisation lever.
+    // a monetisation lever. Voice is the most generous because it is the
+    // product; the other two are supporting features.
     "SCANS_PER_DAY": "8",
     "PREVIEWS_PER_DAY": "4",
+    "VOICE_SESSIONS_PER_DAY": "12",
 
     // Across every device, per day. The number that actually protects the
     // budget. Lower it before sharing the URL widely; raise it for a demo.
@@ -78,6 +80,7 @@
   }
 
   // Secrets, set with `wrangler secret put`:
-  //   ASSEMBLYAI_API_KEY   AssemblyAI key. Never reaches the client.
+  //   ASSEMBLYAI_API_KEY   AssemblyAI key. Never reaches the client — the
+  //                        Worker mints a single-use token instead.
   //   GEMINI_API_KEY       Google AI Studio key.
 }

@@ -23,6 +23,7 @@ import {
 import { postPlate } from './plate';
 import { getPreview, postPreview } from './preview';
 import { postScan } from './scan';
+import { postVoiceToken } from './voice_token';
 
 export { GlobalCap, QuotaCounter } from './quota';
 
@@ -144,6 +145,14 @@ async function plateRoute(request: Request, env: Env): Promise<Response> {
   return postPlate(request, env);
 }
 
+// One voice session is one minted token. The per-IP ceiling is tighter than the
+// others because a token is the cheapest thing here to ask for and the most
+// expensive thing to be handed.
+async function voiceTokenRoute(request: Request, env: Env): Promise<Response> {
+  await enforceLimit(env, `voice:${clientIp(request)}`, 20, 3600);
+  return postVoiceToken(request, env);
+}
+
 const ROUTES: Record<string, Partial<Record<string, Handler>>> = {
   '/v1/device': { POST: postDevice, DELETE: deleteDevice },
   '/v1/scan': { POST: scanRoute },
@@ -151,6 +160,7 @@ const ROUTES: Record<string, Partial<Record<string, Handler>>> = {
   '/v1/quota': { GET: getQuota },
   '/v1/report': { POST: postReport },
   '/v1/plate': { POST: plateRoute },
+  '/v1/voice/token': { POST: voiceTokenRoute },
 };
 
 export default {
@@ -164,6 +174,8 @@ export default {
       return json({
         ok: true,
         budget,
+        // Whether voice can work at all, without saying anything about the key.
+        voice: env.ASSEMBLYAI_API_KEY ? 'configured' : 'unconfigured',
         models: { vision: env.MODEL_VISION, image: env.MODEL_IMAGE },
       });
     }

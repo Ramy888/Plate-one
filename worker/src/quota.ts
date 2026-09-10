@@ -17,6 +17,7 @@ import { DurableObject } from 'cloudflare:workers';
 export interface QuotaState {
   scansUsed: number;
   previewsUsed: number;
+  voiceUsed: number;
   /** Unix seconds at which the current counting window opened. */
   windowStart: number;
 }
@@ -26,6 +27,8 @@ export interface QuotaView {
   /** What is left today, not what has been spent. */
   scans: number;
   previews: number;
+  /** Voice sessions. The main feature, so the most generous of the three. */
+  voice: number;
   resetsAt: number;
 }
 
@@ -34,8 +37,12 @@ const DAY = 24 * 60 * 60;
 /** Daily caps per device. A spend ceiling, not a monetisation lever. */
 export const SCANS_PER_DAY = 8;
 export const PREVIEWS_PER_DAY = 4;
+export const VOICE_SESSIONS_PER_DAY = 12;
 
-const EMPTY: QuotaState = { scansUsed: 0, previewsUsed: 0, windowStart: 0 };
+/** The three things that cost money, and the only things counted here. */
+export type Spend = 'scan' | 'preview' | 'voice';
+
+const EMPTY: QuotaState = { scansUsed: 0, previewsUsed: 0, voiceUsed: 0, windowStart: 0 };
 
 export class QuotaCounter extends DurableObject<Env> {
   private get scansPerDay(): number {
@@ -46,22 +53,39 @@ export class QuotaCounter extends DurableObject<Env> {
     return Number(this.env.PREVIEWS_PER_DAY ?? PREVIEWS_PER_DAY);
   }
 
+  private get voicePerDay(): number {
+    return Number(this.env.VOICE_SESSIONS_PER_DAY ?? VOICE_SESSIONS_PER_DAY);
+  }
+
   private async load(now: number): Promise<QuotaState> {
     const stored = (await this.ctx.storage.get<QuotaState>('state')) ?? { ...EMPTY };
 
     if (stored.windowStart === 0 || now - stored.windowStart >= DAY) {
-      const next: QuotaState = { scansUsed: 0, previewsUsed: 0, windowStart: now };
+      const next: QuotaState = { ...EMPTY, windowStart: now };
       await this.ctx.storage.put('state', next);
       return next;
     }
-    return stored;
+    // `voiceUsed` arrived after the first devices did, so a row written before
+    // it existed has no such field. Default it rather than propagating NaN
+    // through the arithmetic.
+    return { ...EMPTY, ...stored };
   }
 
   private view(state: QuotaState): QuotaView {
     return {
       scans: Math.max(0, this.scansPerDay - state.scansUsed),
       previews: Math.max(0, this.previewsPerDay - state.previewsUsed),
+      voice: Math.max(0, this.voicePerDay - state.voiceUsed),
       resetsAt: state.windowStart + DAY,
+    };
+  }
+
+  private static spent(state: QuotaState, kind: Spend, by: number): QuotaState {
+    return {
+      ...state,
+      scansUsed: state.scansUsed + (kind === 'scan' ? by : 0),
+      previewsUsed: state.previewsUsed + (kind === 'preview' ? by : 0),
+      voiceUsed: state.voiceUsed + (kind === 'voice' ? by : 0),
     };
   }
 
@@ -74,17 +98,14 @@ export class QuotaCounter extends DurableObject<Env> {
    * Spends one unit if there is one. Returns the allowance either way, so a
    * refusal can still tell the caller why and when it changes.
    */
-  async spend(kind: 'scan' | 'preview', now: number): Promise<{ ok: boolean; quota: QuotaView }> {
+  async spend(kind: Spend, now: number): Promise<{ ok: boolean; quota: QuotaView }> {
     const state = await this.load(now);
     const before = this.view(state);
-    const available = kind === 'scan' ? before.scans : before.previews;
-    if (available <= 0) return { ok: false, quota: before };
+    if (before[kind === 'scan' ? 'scans' : kind === 'preview' ? 'previews' : 'voice'] <= 0) {
+      return { ok: false, quota: before };
+    }
 
-    const next: QuotaState = {
-      ...state,
-      scansUsed: state.scansUsed + (kind === 'scan' ? 1 : 0),
-      previewsUsed: state.previewsUsed + (kind === 'preview' ? 1 : 0),
-    };
+    const next = QuotaCounter.spent(state, kind, 1);
     await this.ctx.storage.put('state', next);
     return { ok: true, quota: this.view(next) };
   }
@@ -93,12 +114,15 @@ export class QuotaCounter extends DurableObject<Env> {
    * Gives a spent unit back. Called when the model errors after the quota was
    * taken — the user should not pay for our failure.
    */
-  async refund(kind: 'scan' | 'preview', now: number): Promise<void> {
+  async refund(kind: Spend, now: number): Promise<void> {
     const state = await this.load(now);
+    const given = QuotaCounter.spent(state, kind, -1);
     await this.ctx.storage.put('state', {
-      ...state,
-      scansUsed: Math.max(0, state.scansUsed - (kind === 'scan' ? 1 : 0)),
-      previewsUsed: Math.max(0, state.previewsUsed - (kind === 'preview' ? 1 : 0)),
+      ...given,
+      // A refund must never mint allowance out of nothing.
+      scansUsed: Math.max(0, given.scansUsed),
+      previewsUsed: Math.max(0, given.previewsUsed),
+      voiceUsed: Math.max(0, given.voiceUsed),
     });
   }
 

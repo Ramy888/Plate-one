@@ -81,46 +81,13 @@ export function requireString(
   return trimmed;
 }
 
-/**
- * Deliberately permissive. Strict RFC email validation rejects real addresses;
- * the only thing that proves an address works is sending to it.
- */
-const EMAIL_RE = /^[^\s@]+@[^\s@.]+\.[^\s@]{2,}$/;
-
-export function normalizeEmail(raw: string): string {
-  const email = raw.trim().toLowerCase();
-  if (email.length > 254 || !EMAIL_RE.test(email)) {
-    throw new ApiError(400, 'invalid_email', 'That does not look like an email address.');
-  }
-  return email;
-}
-
-export const MIN_PASSWORD_LENGTH = 8;
-const MAX_PASSWORD_LENGTH = 200;
-
-export function validatePassword(raw: unknown): string {
-  if (typeof raw !== 'string') {
-    throw new ApiError(400, 'missing_field', 'password is required.');
-  }
-  // Not trimmed: leading and trailing spaces are legitimate password characters.
-  if (raw.length < MIN_PASSWORD_LENGTH) {
-    throw new ApiError(
-      400,
-      'weak_password',
-      `Use at least ${MIN_PASSWORD_LENGTH} characters.`,
-    );
-  }
-  if (raw.length > MAX_PASSWORD_LENGTH) {
-    throw new ApiError(400, 'invalid_field', 'That password is too long.');
-  }
-  return raw;
-}
-
 export function bearerToken(request: Request): string {
   const header = request.headers.get('authorization') ?? '';
   const match = /^Bearer\s+(\S+)$/i.exec(header);
   if (!match) {
-    throw new ApiError(401, 'unauthorized', 'Sign in to continue.');
+    // Not an account — this is the anonymous device token. There is nothing to
+    // sign into, so the message says what to do rather than who to be.
+    throw new ApiError(401, 'unauthorized', 'This device is not registered.');
   }
   return match[1];
 }

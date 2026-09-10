@@ -15,8 +15,16 @@ export default defineWorkersConfig({
         isolatedStorage: false,
         wrangler: { configPath: './wrangler.jsonc' },
         miniflare: {
-          // Handed to the setup file, which applies them before each test.
-          bindings: { TEST_MIGRATIONS: migrations },
+          bindings: {
+            // Handed to the setup file, which applies them before each test.
+            TEST_MIGRATIONS: migrations,
+            // Deliberately fake, and deliberately overriding whatever is in
+            // .dev.vars. A test run must not depend on a real key existing, and
+            // the assertion that the key never reaches the client is only
+            // meaningful against a value the test controls.
+            ASSEMBLYAI_API_KEY: 'test-assemblyai-key-not-real',
+            GEMINI_API_KEY: 'test-gemini-key-not-real',
+          },
         },
       },
     },
