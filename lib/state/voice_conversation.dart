@@ -3,8 +3,14 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/agent_prompt.dart';
+import '../data/agent_tools.dart';
 import '../data/voice_agent_events.dart';
 import '../data/voice_agent_session.dart';
+import '../domain/food_matcher.dart';
+import '../domain/models.dart';
+import 'plate_providers.dart';
+import 'providers.dart';
 import 'scan_providers.dart';
 
 /// One line in the thread.
@@ -92,9 +98,66 @@ class VoiceConversationState {
 /// Builds a session. Overridden in tests with one that has no socket.
 typedef VoiceSessionFactory = VoiceSession Function();
 
+/// What the conversation settled on, or null before it has.
+///
+/// Held here rather than inside the tools because the screen has to rebuild
+/// when it changes, and the tools are deliberately free of Riverpod.
+class ChosenPatch extends Notifier<Patch?> {
+  @override
+  Patch? build() => null;
+
+  void set(Patch? patch) => state = patch;
+}
+
+final chosenPatchProvider = NotifierProvider<ChosenPatch, Patch?>(ChosenPatch.new);
+
+/// The engine, wired to the app's own draft and given to the agent as tools.
+///
+/// `ref.read` throughout: the factory runs once per session, and the tools are
+/// called much later — a watched value read here would be a snapshot of the
+/// moment the conversation started.
+final agentToolsProvider = Provider<AgentTools>((ref) {
+  final catalog = ref.read(catalogProvider);
+
+  return AgentTools(
+    matcher: FoodMatcher(catalog.foods),
+    // Deliberately the same provider the result screen reads. One
+    // recommendation path, so the agent and the app cannot come to different
+    // conclusions about the same plate.
+    recommend: () => ref.read(patchResultProvider),
+    setSlot: (slot) => ref.read(mealDraftProvider.notifier).setSlot(slot),
+    setFoods: (ids) {
+      final draft = ref.read(mealDraftProvider.notifier);
+      final already = ref.read(mealDraftProvider).foodIds;
+      for (final id in already.where((id) => !ids.contains(id))) {
+        draft.toggleFood(id);
+      }
+      for (final id in ids.where((id) => !already.contains(id))) {
+        draft.toggleFood(id);
+      }
+    },
+    currentFoodIds: () => ref.read(mealDraftProvider).foodIds.toList(),
+    currentSlot: () => ref.read(mealDraftProvider).slot,
+    // Fire-and-forget: drawing is a model call and an image, and the agent
+    // must not go quiet for the half-minute it takes. The card appears at
+    // once; the picture catches up.
+    onChoose: ({required patch, required foodIds}) {
+      ref.read(chosenPatchProvider.notifier).set(patch);
+      unawaited(
+        ref.read(plateVisualProvider.notifier).load(
+              foodIds: foodIds,
+              additionId: patch.addition.id,
+            ),
+      );
+    },
+  );
+});
+
 /// The real thing: mints a token through the Worker, which is the only place
 /// the AssemblyAI key exists.
 final voiceSessionFactoryProvider = Provider<VoiceSessionFactory>((ref) {
+  final tools = ref.read(agentToolsProvider);
+
   return () => VoiceAgentSession(
         mintToken: () async {
           final token = await ref.read(scanControllerProvider.notifier).deviceToken();
@@ -106,19 +169,10 @@ final voiceSessionFactoryProvider = Provider<VoiceSessionFactory>((ref) {
         systemPrompt: voiceSystemPrompt,
         greeting: 'What is on your plate?',
         voiceId: 'anna',
+        tools: AgentTools.schemas,
+        onToolCall: tools.dispatch,
       );
 });
-
-/// Phase 2 has no tools yet, so this only has to hold a conversation and stop
-/// short of the recommendation. The engine takes that job in Phase 3.
-const voiceSystemPrompt = '''
-You are Plate One. Someone is telling you what is on their plate right now.
-
-Ask short questions until you know what the meal is. One question at a time,
-one sentence each. Do not list options, do not explain nutrition, and do not
-suggest anything to add yet — say you are still listening if asked.
-
-Speak plainly, the way someone would across a table.''';
 
 /// Owns the session and turns its events into a thread.
 ///

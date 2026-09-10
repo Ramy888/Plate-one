@@ -6,9 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plateone/data/voice_agent_events.dart';
 import 'package:plateone/data/voice_agent_session.dart';
+import 'package:plateone/data/catalog.dart';
+import 'package:plateone/data/prefs_repository.dart';
+import 'package:plateone/domain/models.dart';
+import 'package:plateone/domain/patch_engine.dart';
+import 'package:plateone/state/providers.dart';
 import 'package:plateone/state/voice_conversation.dart';
 import 'package:plateone/ui/theme.dart';
 import 'package:plateone/ui/voice_agent_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// A conversation with nothing behind it.
 ///
@@ -254,6 +260,47 @@ void main() {
     expect(session.disposed, isTrue);
   });
 
+  testWidgets('the engine\'s choice appears as soon as it is made', (tester) async {
+    // The words are the answer. The picture is decoration that catches up —
+    // waiting for it would leave the person staring at nothing for the half
+    // minute a drawing takes.
+    final catalog = await Catalog.load();
+    final engine = PatchEngine(additions: catalog.additions);
+    final result = engine.patch(
+      slot: MealSlot.lunchDinner,
+      foods: catalog.foodsByIds({'white_rice'}),
+      goal: Goal.feelSatisfied,
+      isPro: true,
+    );
+    final chosen = result.patches.first;
+
+    session = FakeSession();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          prefsRepositoryProvider.overrideWithValue(await _prefs()),
+          catalogProvider.overrideWithValue(catalog),
+          voiceSessionFactoryProvider.overrideWithValue(() => session),
+        ],
+        child: MaterialApp(theme: buildTheme(), home: const VoiceAgentScreen()),
+      ),
+    );
+
+    expect(find.text(chosen.addition.name), findsNothing);
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(VoiceAgentScreen)),
+    );
+    container.read(chosenPatchProvider.notifier).set(chosen);
+    await tester.pump();
+
+    expect(find.text(chosen.addition.name), findsOneWidget);
+    expect(find.text('Keep this'), findsOneWidget);
+    // And it stands on its own before any picture exists: the words are the
+    // answer, the drawing is decoration that catches up.
+    expect(find.byType(Image), findsNothing);
+  });
+
   testWidgets('the answer time is put in front of whoever is watching',
       (tester) async {
     // The demo's headline number, measured from the first turn rather than
@@ -269,4 +316,9 @@ void main() {
 
     expect(find.textContaining('ms'), findsOneWidget);
   });
+}
+
+Future<PrefsRepository> _prefs() async {
+  SharedPreferences.setMockInitialValues({});
+  return PrefsRepository(await SharedPreferences.getInstance());
 }

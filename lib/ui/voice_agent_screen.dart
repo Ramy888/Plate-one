@@ -3,7 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/voice_agent_session.dart';
+import '../domain/models.dart';
+import '../state/plate_providers.dart';
+import '../state/providers.dart';
+import '../state/save_patch.dart';
 import '../state/voice_conversation.dart';
+import 'icons.g.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
 import 'widgets/mic_button.dart';
@@ -21,6 +26,9 @@ class VoiceAgentScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final voice = ref.watch(voiceConversationProvider);
     final conversation = ref.read(voiceConversationProvider.notifier);
+    // The answer can outlive the words that produced it — a conversation that
+    // ended still has its plate on screen.
+    final hasAnswer = ref.watch(chosenPatchProvider) != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -34,8 +42,11 @@ class VoiceAgentScreen extends ConsumerWidget {
         child: Column(
           children: [
             _AgentState(state: voice),
+            // The answer scrolls with the conversation rather than competing
+            // with it for space: on a long thread a fixed card either pushes
+            // the microphone off the screen or overflows.
             Expanded(
-              child: voice.turns.isEmpty
+              child: voice.turns.isEmpty && !hasAnswer
                   ? _Waiting(live: voice.isLive)
                   : _Thread(turns: voice.turns),
             ),
@@ -111,8 +122,11 @@ class _Thread extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: Space.lg),
-      itemCount: turns.length,
-      itemBuilder: (context, i) => _Bubble(turn: turns[i]),
+      // The engine's answer is the last thing in the conversation, because
+      // that is what it is.
+      itemCount: turns.length + 1,
+      itemBuilder: (context, i) =>
+          i < turns.length ? _Bubble(turn: turns[i]) : const _ChosenPatch(),
     );
   }
 }
@@ -221,6 +235,115 @@ class _Failure extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// What the engine chose, once the conversation has settled on it.
+///
+/// The plate the engine decided on is drawn by the Worker from catalogue ids
+/// alone — no spoken words reach the image model — so this is a picture of a
+/// decision, not of a sentence somebody said.
+class _ChosenPatch extends ConsumerWidget {
+  const _ChosenPatch();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Read before anything else, and leave early. Nothing below this line is
+    // wanted until the conversation has settled on something, and reaching for
+    // the engine's result first would make an empty screen depend on it.
+    final chosen = ref.watch(chosenPatchProvider)?.addition;
+    if (chosen == null) return const SizedBox.shrink();
+
+    final visual = ref.watch(plateVisualProvider);
+    final patch = ref.watch(patchResultProvider);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: Space.sm, bottom: Space.md),
+      child: PlateCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PatchHighlight(
+              icon: catalogIcon(chosen.icon),
+              name: chosen.name,
+              how: chosen.how,
+            ),
+            const SizedBox(height: Space.md),
+            _Picture(visual: visual),
+            if (visual.caption.isNotEmpty) ...[
+              const SizedBox(height: Space.md),
+              Text(visual.caption, style: Theme.of(context).textTheme.bodyMedium),
+            ],
+            const SizedBox(height: Space.sm),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () => savePatch(
+                    context,
+                    ref,
+                    slot: patch.slot,
+                    foodIds: patch.foods.map((f) => f.id).toList(),
+                    addition: chosen,
+                    gapIds: patch.gaps.map((g) => g.id).toList(),
+                    image: visual.image,
+                  ),
+                  icon: const Icon(LucideIcons.bookmark, size: 18),
+                  label: const Text('Keep this'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The picture, or an honest space where one would have been.
+class _Picture extends StatelessWidget {
+  const _Picture({required this.visual});
+
+  final PlateVisual visual;
+
+  /// The same whether it is a picture or the space one is arriving in, so the
+  /// card does not jump when the drawing lands.
+  static const _height = 160.0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (visual.image case final bytes?) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(kRadiusSmall),
+        // Bounded on purpose. An unconstrained Image.memory takes its natural
+        // size, and a generated plate is big enough to push the microphone off
+        // the bottom of the screen — the one control the conversation needs.
+        child: SizedBox(
+          height: _height,
+          width: double.infinity,
+          child: Image.memory(bytes, fit: BoxFit.cover),
+        ),
+      );
+    }
+
+    // A failed drawing is not an error worth a dialog: the words above are the
+    // whole answer, and the app promises the picture is decoration.
+    if (visual.unavailable) return const SizedBox.shrink();
+
+    return Container(
+      height: _height,
+      decoration: BoxDecoration(
+        color: PlateColors.neutral200,
+        borderRadius: BorderRadius.circular(kRadiusSmall),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        visual.loading ? 'Drawing your plate…' : '',
+        style: Theme.of(context)
+            .textTheme
+            .bodyMedium
+            ?.copyWith(color: PlateColors.inkSoft),
       ),
     );
   }
