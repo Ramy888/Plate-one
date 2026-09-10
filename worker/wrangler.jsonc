@@ -76,7 +76,12 @@
 
     // Across every device, per day. The number that actually protects the
     // budget. Lower it before sharing the URL widely; raise it for a demo.
-    "GLOBAL_CALLS_PER_DAY": "2000"
+    "GLOBAL_CALLS_PER_DAY": "2000",
+
+    // Browser origins allowed to call this API. The app's own page must be
+    // here or every call fails before it is sent. Comma-separated; the
+    // localhost entries are for `flutter run -d chrome` and a local build.
+    "ALLOWED_ORIGINS": "https://plateone.pages.dev,http://localhost:8080,http://localhost:8000"
   }
 
   // Secrets, set with `wrangler secret put`:

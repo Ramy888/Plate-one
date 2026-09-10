@@ -10,6 +10,7 @@
  * it — because this is a public demo URL with a finite budget behind it.
  */
 import { globalCap } from './budget';
+import { preflight, withCors } from './cors';
 import { authenticateDevice, forgetDevice, normalizePlatform, quotaFor, registerDevice } from './device';
 import {
   ApiError,
@@ -165,7 +166,17 @@ const ROUTES: Record<string, Partial<Record<string, Handler>>> = {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // Every response leaves through one door, so a route added later cannot
+    // forget its CORS headers and fail only in a browser.
+    return withCors(await handle(request, env, ctx), request, env);
+  },
+} satisfies ExportedHandler<Env>;
+
+async function handle(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+
+    const options = preflight(request, env);
+    if (options) return options;
 
     if (url.pathname === '/health') {
       // Reported honestly, so a misconfigured or exhausted deployment is
@@ -207,5 +218,4 @@ export default {
     } catch (error) {
       return errorResponse(error);
     }
-  },
-} satisfies ExportedHandler<Env>;
+}

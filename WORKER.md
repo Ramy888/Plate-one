@@ -82,6 +82,21 @@ is the only version of this that survives contact with someone trying.
 build the meal by hand — that path has no network, no allowance and no model in
 it, and it always works.
 
+**The app's own page is on a different origin, so CORS is not optional.**
+`ALLOWED_ORIGINS` is a comma-separated allowlist, and a browser origin missing
+from it fails every call before it is sent — the app looks offline and this
+Worker's log stays empty, which is a miserable thing to debug. It is an
+allowlist rather than `*` for cost, not for secrecy: CORS does not protect the
+device token, but any page allowed here can spend this deployment's budget
+through its own visitors' browsers.
+
+Two things to remember:
+
+- **The deployed page's URL has to be added before it will work.** The default
+  is a placeholder.
+- `flutter run -d chrome` picks a random port, which will not be on the list.
+  Pass `--web-port 8080` and build against `PLATEONE_API=http://localhost:8787`.
+
 ## Configuration
 
 Vars live in `wrangler.jsonc`. Secrets are set with `wrangler secret put`:
@@ -106,7 +121,7 @@ npx wrangler r2 bucket create plateone-previews
 cp ../.env.example .dev.vars             # then fill it in
 npm run migrate:local
 npm run dev
-npx vitest run                           # 65 tests
+npx vitest run                           # 82 tests
 ```
 
 The R2 bucket wants a lifecycle rule deleting anything under `p/` after 24
