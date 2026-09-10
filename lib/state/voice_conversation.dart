@@ -21,6 +21,7 @@ class VoiceTurn {
     required this.text,
     this.settled = false,
     this.interrupted = false,
+    this.options = const [],
   });
 
   final bool fromUser;
@@ -34,11 +35,16 @@ class VoiceTurn {
   /// interrupted is the demo, not a bug.
   final bool interrupted;
 
+  /// What the engine offered at this point in the conversation, if anything.
+  /// Rendered as a row of cards the person can tap instead of speaking.
+  final List<Patch> options;
+
   VoiceTurn copyWith({String? text, bool? settled, bool? interrupted}) => VoiceTurn(
         fromUser: fromUser,
         text: text ?? this.text,
         settled: settled ?? this.settled,
         interrupted: interrupted ?? this.interrupted,
+        options: options,
       );
 }
 
@@ -150,6 +156,13 @@ final agentToolsProvider = Provider<AgentTools>((ref) {
             ),
       );
     },
+    // The plate catches up with the meal, without an addition on it yet.
+    onMealChanged: (foodIds) {
+      ref.read(chosenPatchProvider.notifier).set(null);
+      unawaited(ref.read(plateVisualProvider.notifier).load(foodIds: foodIds));
+    },
+    onRecommendations: (options) =>
+        ref.read(voiceConversationProvider.notifier).offer(options),
   );
 });
 
@@ -220,6 +233,32 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
         failure: session.failure ?? 'Voice could not start.',
       );
     }
+  }
+
+  /// Puts a row of options into the conversation.
+  ///
+  /// They arrive as their own entry rather than as text, because three things
+  /// to choose between is a thing you tap, not a sentence you listen to twice.
+  void offer(List<Patch> options) {
+    if (options.isEmpty) return;
+    state = state.copyWith(
+      turns: [...state.turns, VoiceTurn(fromUser: false, text: '', settled: true, options: options)],
+    );
+  }
+
+  /// The "Add patch now" path: run the engine and offer what it says, without
+  /// waiting for the conversation to reach the question.
+  void recommendNow() => offer(ref.read(agentToolsProvider).recommendNow());
+
+  /// Draws one of the offered options, as though it had been agreed out loud.
+  void choose(Patch patch) {
+    ref.read(chosenPatchProvider.notifier).set(patch);
+    unawaited(
+      ref.read(plateVisualProvider.notifier).load(
+            foodIds: ref.read(mealDraftProvider).foodIds.toList(),
+            additionId: patch.addition.id,
+          ),
+    );
   }
 
   Future<void> stop() async {

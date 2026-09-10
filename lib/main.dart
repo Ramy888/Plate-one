@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'data/catalog.dart';
 import 'data/prefs_repository.dart';
 import 'state/providers.dart';
-import 'ui/meal_screen.dart';
+import 'ui/voice_agent_screen.dart';
 import 'ui/onboarding_screen.dart';
 import 'ui/theme.dart';
 
@@ -47,6 +47,6 @@ class _RootGate extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final onboarded = ref.watch(settingsProvider.select((s) => s.onboarded));
-    return onboarded ? const MealScreen() : const OnboardingScreen();
+    return onboarded ? const VoiceAgentScreen() : const OnboardingScreen();
   }
 }

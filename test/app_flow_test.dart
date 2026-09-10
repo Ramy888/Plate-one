@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -10,7 +11,8 @@ import 'package:plateone/data/patch_images.dart';
 import 'package:plateone/data/prefs_repository.dart';
 import 'package:plateone/domain/models.dart';
 import 'package:plateone/state/providers.dart';
-import 'package:plateone/ui/meal_screen.dart';
+import 'package:plateone/ui/food_picker_screen.dart';
+import 'package:plateone/ui/voice_agent_screen.dart';
 import 'package:plateone/ui/onboarding_screen.dart';
 import 'package:plateone/ui/saved_screen.dart';
 import 'package:plateone/ui/settings_screen.dart';
@@ -75,7 +77,7 @@ class _Root extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final onboarded = ref.watch(settingsProvider.select((s) => s.onboarded));
-    return onboarded ? const MealScreen() : const OnboardingScreen();
+    return onboarded ? const VoiceAgentScreen() : const OnboardingScreen();
   }
 }
 
@@ -91,11 +93,22 @@ Future<void> _tapTile(WidgetTester tester, String label) async {
 }
 
 
-/// Opens the food page for the meal currently showing on the hub. Tapping the
-/// card you are already on is what opens it.
+/// Opens the food page.
+///
+/// It is no longer a tile on the home screen: speaking is the way in, and
+/// picking foods by hand is the fallback someone reaches when the
+/// conversation cannot happen. These tests exercise that fallback directly,
+/// the same way the failure card pushes it.
 Future<void> _openFoodPicker(WidgetTester tester) async {
-  if (find.text('Tap to pick the food').evaluate().isEmpty) return;
-  await tester.tap(find.text('Tap to pick the food'));
+  if (find.byType(FoodPickerScreen).evaluate().isNotEmpty) return;
+  final navigator = tester.state<NavigatorState>(find.byType(Navigator).last);
+  unawaited(
+    navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => const FoodPickerScreen(slot: MealSlot.lunchDinner),
+      ),
+    ),
+  );
   await tester.pumpAndSettle();
 }
 
@@ -192,7 +205,7 @@ void main() {
     await tester.tap(find.text('Start patching'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(MealScreen), findsOneWidget);
+    expect(find.byType(VoiceAgentScreen), findsOneWidget);
     expect(container.read(settingsProvider).goal, Goal.moreEnergy);
     expect(container.read(settingsProvider).dietPrefs, contains(DietPref.vegetarian));
   });
@@ -205,7 +218,7 @@ void main() {
     });
     // Reaching the meal screen at all proves onboarded was read back; the
     // engine result below proves the preference was too.
-    expect(find.byType(MealScreen), findsOneWidget);
+    expect(find.byType(VoiceAgentScreen), findsOneWidget);
   });
 
   testWidgets('the patch button stays disabled until a food is picked',
@@ -282,7 +295,7 @@ void main() {
     expect(container.read(historyProvider).single.satisfaction, Satisfaction.stillHungry);
     // The plate is cleared so the next meal starts fresh.
     expect(container.read(mealDraftProvider).isEmpty, isTrue);
-    expect(find.byType(MealScreen), findsOneWidget);
+    expect(find.byType(VoiceAgentScreen), findsOneWidget);
   });
 
   testWidgets('vegetarian users are never shown meat or fish', (tester) async {
@@ -446,7 +459,7 @@ void main() {
       }
     });
 
-    testWidgets('settings is reachable from the meal screen', (tester) async {
+    testWidgets('settings is reachable from the home screen', (tester) async {
       await _pumpApp(tester, prefs: {'onboarded': true});
       await tester.tap(find.byIcon(LucideIcons.settings));
       await tester.pumpAndSettle();
@@ -454,23 +467,5 @@ void main() {
     });
   });
 
-  testWidgets('changing meal slot clears the plate', (tester) async {
-    final container = await _pumpApp(tester, prefs: {'onboarded': true});
 
-    await _tapFood(tester, 'Rice');
-    expect(container.read(mealDraftProvider).foodIds, isNotEmpty);
-
-    // Back to the hub to change meal — the pager lives there, not on the food
-    // page the previous tap opened.
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-
-    // The neighbouring cards only peek onto the screen, so this swipes the
-    // pager the way a thumb does rather than tapping a half-visible card.
-    await tester.drag(find.byType(PageView), const Offset(400, 0));
-    await tester.pumpAndSettle();
-
-    expect(container.read(mealDraftProvider).slot, MealSlot.breakfast);
-    expect(container.read(mealDraftProvider).foodIds, isEmpty);
-  });
 }

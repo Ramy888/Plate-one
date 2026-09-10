@@ -44,16 +44,23 @@ class PlateVisualController extends Notifier<PlateVisual> {
   /// the user has already moved on from is dropped rather than shown.
   String _wanted = '';
 
+  /// Draws a plate.
+  ///
+  /// An empty [additionId] means the meal on its own, which is what the plate
+  /// shows while the conversation is still filling it in. The Worker caches by
+  /// content, so redrawing a plate somebody has already seen is instant.
   Future<void> load({
     required List<String> foodIds,
-    required String additionId,
+    String additionId = '',
   }) async {
-    if (additionId.isEmpty) return;
+    if (foodIds.isEmpty && additionId.isEmpty) return;
     final key = '${foodIds.join(',')}|$additionId';
     if (key == _wanted && (state.image != null || state.loading)) return;
 
     _wanted = key;
-    state = const PlateVisual(loading: true);
+    // The picture already on screen stays while the new one is drawn: a plate
+    // that blanks out on every word is worse than one that lags.
+    state = PlateVisual(image: state.image, caption: state.caption, loading: true);
 
     try {
       final token = await ref.read(scanControllerProvider.notifier).deviceToken();

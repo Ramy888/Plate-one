@@ -8,12 +8,13 @@ import 'package:plateone/data/voice_agent_events.dart';
 import 'package:plateone/data/voice_agent_session.dart';
 import 'package:plateone/data/catalog.dart';
 import 'package:plateone/data/prefs_repository.dart';
-import 'package:plateone/domain/models.dart';
-import 'package:plateone/domain/patch_engine.dart';
 import 'package:plateone/state/providers.dart';
+import 'package:plateone/state/plate_providers.dart';
 import 'package:plateone/state/voice_conversation.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:plateone/ui/theme.dart';
 import 'package:plateone/ui/voice_agent_screen.dart';
+import 'package:plateone/ui/widgets/mic_button.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// A conversation with nothing behind it.
@@ -82,24 +83,51 @@ class FakeSession implements VoiceSession {
 void main() {
   late FakeSession session;
 
-  Future<void> open(WidgetTester tester, {String? failOnStart}) async {
+  // Loaded once. Reading the bundled catalogue on every test is slow and, more
+  // to the point, the asset bundle does not enjoy being asked repeatedly.
+  late Catalog catalog;
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    catalog = await Catalog.load();
+  });
+
+  /// Opens the home screen with the app's real providers behind it, and hands
+  /// back the container so a test can drive state the way the agent would.
+  Future<ProviderContainer> openHome(
+    WidgetTester tester, {
+    String? failOnStart,
+  }) async {
     session = FakeSession(failOnStart: failOnStart);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          prefsRepositoryProvider.overrideWithValue(await _prefs()),
+          catalogProvider.overrideWithValue(catalog),
           voiceSessionFactoryProvider.overrideWithValue(() => session),
+          // No network in a widget test. Drawing a plate is a Worker call and
+          // a model behind it; what is under test here is what the screen does
+          // with the answer, not the asking.
+          plateVisualProvider.overrideWith(_NoDrawing.new),
         ],
-        child: MaterialApp(
-          theme: buildTheme(),
-          home: const VoiceAgentScreen(),
+        child: MediaQuery(
+          // The skeleton sweep is deliberately endless; a test that settles on
+          // it never finishes.
+          data: const MediaQueryData(disableAnimations: true),
+          child: MaterialApp(theme: buildTheme(), home: const VoiceAgentScreen()),
         ),
       ),
     );
+    await tester.pump();
+    return ProviderScope.containerOf(tester.element(find.byType(VoiceAgentScreen)));
   }
 
   /// Taps the microphone and lets the state settle.
   Future<void> tapMic(WidgetTester tester) async {
-    await tester.tap(find.byType(InkWell).first);
+    // Specifically the microphone. The app bar now has buttons of its own, and
+    // "the first InkWell" quietly became the bookmark icon.
+    await tester.tap(
+      find.descendant(of: find.byType(MicButton), matching: find.byType(InkWell)),
+    );
     // Not pumpAndSettle: the mic's ring is a real animation and settling on it
     // is slower than it is useful.
     await tester.pump();
@@ -107,14 +135,14 @@ void main() {
   }
 
   testWidgets('opens quiet, and says what to do', (tester) async {
-    await open(tester);
+    await openHome(tester);
     expect(find.text('Tap to talk'), findsOneWidget);
     expect(find.textContaining('Tap the microphone'), findsOneWidget);
     expect(session.started, isFalse, reason: 'nothing is spent by arriving');
   });
 
   testWidgets('the microphone starts the conversation', (tester) async {
-    await open(tester);
+    await openHome(tester);
     await tapMic(tester);
 
     expect(session.started, isTrue);
@@ -124,7 +152,7 @@ void main() {
   testWidgets('the state is on screen at every step', (tester) async {
     // A demo is watched, not used. Whoever is watching has to be able to tell
     // listening from thinking from speaking without being told.
-    await open(tester);
+    await openHome(tester);
     await tapMic(tester);
 
     for (final (next, label) in [
@@ -142,7 +170,7 @@ void main() {
   testWidgets('a user partial is replaced, never concatenated', (tester) async {
     // Each `transcript.user.delta` is the whole transcript so far. Appending
     // them renders "rice rice and rice and chicken".
-    await open(tester);
+    await openHome(tester);
     await tapMic(tester);
     session.becomes(VoiceAgentState.listening);
 
@@ -162,7 +190,7 @@ void main() {
 
   testWidgets('an agent partial is appended, never replaced', (tester) async {
     // And this one is the opposite: `delta` is the next word.
-    await open(tester);
+    await openHome(tester);
     await tapMic(tester);
 
     session.says(const ReplyStarted('r1'));
@@ -175,7 +203,7 @@ void main() {
   });
 
   testWidgets('a settled turn stays in the thread', (tester) async {
-    await open(tester);
+    await openHome(tester);
     await tapMic(tester);
 
     session.says(const SpeechStarted());
@@ -189,7 +217,7 @@ void main() {
   });
 
   testWidgets('an interruption is shown, because it is the point', (tester) async {
-    await open(tester);
+    await openHome(tester);
     await tapMic(tester);
 
     session.says(const ReplyStarted('r1'));
@@ -200,7 +228,7 @@ void main() {
   });
 
   testWidgets('the microphone ends a live conversation', (tester) async {
-    await open(tester);
+    await openHome(tester);
     await tapMic(tester);
     session.becomes(VoiceAgentState.listening);
     await tester.pump();
@@ -211,7 +239,7 @@ void main() {
 
   testWidgets('a refusal keeps the words and offers a way out', (tester) async {
     // The standing rule: an AI failure is never a dead end.
-    await open(
+    await openHome(
       tester,
       failOnStart: 'Plate One has answered as many questions as it can today.',
     );
@@ -260,52 +288,71 @@ void main() {
     expect(session.disposed, isTrue);
   });
 
-  testWidgets('the engine\'s choice appears as soon as it is made', (tester) async {
-    // The words are the answer. The picture is decoration that catches up —
-    // waiting for it would leave the person staring at nothing for the half
-    // minute a drawing takes.
-    final catalog = await Catalog.load();
-    final engine = PatchEngine(additions: catalog.additions);
-    final result = engine.patch(
-      slot: MealSlot.lunchDinner,
-      foods: catalog.foodsByIds({'white_rice'}),
-      goal: Goal.feelSatisfied,
-      isPro: true,
-    );
-    final chosen = result.patches.first;
+  testWidgets('the engine\'s options arrive as cards you can try', (tester) async {
+    // Three things to choose between is something you tap, not a sentence you
+    // listen to twice.
+    final container = await openHome(tester);
 
-    session = FakeSession();
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          prefsRepositoryProvider.overrideWithValue(await _prefs()),
-          catalogProvider.overrideWithValue(catalog),
-          voiceSessionFactoryProvider.overrideWithValue(() => session),
-        ],
-        child: MaterialApp(theme: buildTheme(), home: const VoiceAgentScreen()),
-      ),
-    );
-
-    expect(find.text(chosen.addition.name), findsNothing);
-
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(VoiceAgentScreen)),
-    );
-    container.read(chosenPatchProvider.notifier).set(chosen);
+    final options = container.read(agentToolsProvider);
+    container.read(mealDraftProvider.notifier).toggleFood('white_rice');
+    container.read(voiceConversationProvider.notifier).offer(options.recommendNow());
     await tester.pump();
 
-    expect(find.text(chosen.addition.name), findsOneWidget);
+    expect(find.text('Tap one to see it on your plate'), findsOneWidget);
+    final offered = container.read(patchResultProvider).patches;
+    expect(offered, isNotEmpty);
+    expect(find.text(offered.first.addition.name), findsOneWidget);
+  });
+
+  testWidgets('tapping an option puts it on the plate', (tester) async {
+    final container = await openHome(tester);
+
+    container.read(mealDraftProvider.notifier).toggleFood('white_rice');
+    final offered = container.read(agentToolsProvider).recommendNow();
+    container.read(voiceConversationProvider.notifier).offer(offered);
+    await tester.pump();
+
+    expect(container.read(chosenPatchProvider), isNull);
+    await tester.tap(find.text(offered.first.addition.name));
+    await tester.pump();
+
+    expect(container.read(chosenPatchProvider)?.addition.id, offered.first.addition.id);
     expect(find.text('Keep this'), findsOneWidget);
-    // And it stands on its own before any picture exists: the words are the
-    // answer, the drawing is decoration that catches up.
-    expect(find.byType(Image), findsNothing);
+  });
+
+  testWidgets('every settled reply offers the answer without waiting for it',
+      (tester) async {
+    // "Add patch now" — for someone who does not want to talk their way to the
+    // question.
+    final container = await openHome(tester);
+    container.read(mealDraftProvider.notifier).toggleFood('white_rice');
+    // Nothing listens to the session until the conversation has been started.
+    await tapMic(tester);
+
+    session.says(const ReplyStarted('r1'));
+    session.says(const AgentTranscript(text: 'Anything green?', interrupted: false));
+    await tester.pump();
+
+    expect(find.text('Add patch now'), findsOneWidget);
+    await tester.tap(find.text('Add patch now'));
+    await tester.pump();
+
+    expect(find.text('Tap one to see it on your plate'), findsOneWidget);
+  });
+
+  testWidgets('the plate is empty before anything is described', (tester) async {
+    // There has to be something to look at before there is anything to show.
+    await openHome(tester);
+
+    expect(find.byIcon(LucideIcons.utensils), findsOneWidget);
+    expect(find.byType(Image), findsOneWidget, reason: 'the brand mark only');
   });
 
   testWidgets('the answer time is put in front of whoever is watching',
       (tester) async {
     // The demo's headline number, measured from the first turn rather than
     // bolted on at the end.
-    await open(tester);
+    await openHome(tester);
     await tapMic(tester);
 
     session.says(const SpeechStopped());
@@ -321,4 +368,10 @@ void main() {
 Future<PrefsRepository> _prefs() async {
   SharedPreferences.setMockInitialValues({});
   return PrefsRepository(await SharedPreferences.getInstance());
+}
+
+/// A plate that is never drawn. Keeps the widget tests off the network.
+class _NoDrawing extends PlateVisualController {
+  @override
+  Future<void> load({required List<String> foodIds, String additionId = ''}) async {}
 }

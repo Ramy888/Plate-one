@@ -23,6 +23,8 @@ class AgentTools {
     required this.currentFoodIds,
     required this.currentSlot,
     this.onChoose,
+    this.onMealChanged,
+    this.onRecommendations,
     this.onSave,
   });
 
@@ -44,6 +46,16 @@ class AgentTools {
   /// The conversation settled on a patch: show it, and start drawing it.
   /// Deliberately fire-and-forget — see [_choosePatch].
   final void Function({required Patch patch, required List<String> foodIds})? onChoose;
+
+  /// The plate changed. Fires once a `set_meal` or `add_foods` turn is
+  /// finished, not per word — the picture is a model call, and redrawing it
+  /// three times while someone lists three foods would put the plate most of a
+  /// minute behind what they are saying.
+  final void Function(List<String> foodIds)? onMealChanged;
+
+  /// The engine produced options. Puts them in the conversation, so the person
+  /// can pick one by tapping as well as by saying so.
+  final void Function(List<Patch> options)? onRecommendations;
 
   /// Keeps the patch in the history.
   final Future<void> Function({required Addition addition, required List<String> gapIds})?
@@ -184,6 +196,7 @@ class AgentTools {
 
     final resolved = _resolve(args['foods'], slot);
     setFoods(resolved.ids);
+    onMealChanged?.call(resolved.ids);
     return {
       'meal': slot.id,
       'matched': resolved.matched,
@@ -195,7 +208,19 @@ class AgentTools {
     final slot = currentSlot();
     final resolved = _resolve(args['foods'], slot);
     setFoods([...currentFoodIds(), ...resolved.ids]);
+    onMealChanged?.call(currentFoodIds());
     return {'matched': resolved.matched, 'unmatched': resolved.unmatched};
+  }
+
+  /// Runs the engine and offers the result, without the agent asking.
+  ///
+  /// Behind the "Add patch now" button: someone who does not want to wait for
+  /// the conversation to get there can have the answer now. It goes through
+  /// the same path as the tool, so `choose_patch` still recognises what was
+  /// offered and the two cannot disagree about which options exist.
+  List<Patch> recommendNow() {
+    _getRecommendation();
+    return _offered.values.toList();
   }
 
   Map<String, dynamic> _getRecommendation() {
@@ -211,6 +236,8 @@ class AgentTools {
     // A new recommendation invalidates the old choice: the plate moved.
     _chosen = null;
     _gapIds = result.gaps.map((g) => g.id).toList();
+
+    onRecommendations?.call(result.patches);
 
     return {
       'status': result.patches.isEmpty ? 'balanced' : 'ok',
