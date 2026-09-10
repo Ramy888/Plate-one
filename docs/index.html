@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plate One · Tell it what is on your plate</title>
+<meta name="description" content="A voice agent that names the one thing to add to the meal you already have. Built on the AssemblyAI Voice Agent API.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+<header><div class="mark">P</div><strong>Plate One</strong></header>
+
+<h1>Tell it what is on your plate.<br>It names the one thing to add.</h1>
+<p class="lede">Plate One is a voice agent for the smallest useful nutrition question: what would make this meal more satisfying? Not what to cut out, not how many calories are in it, not what you should have eaten instead.</p>
+
+<h2>How it works</h2>
+<p>Say what you are eating. Rough is fine — “rice and some chicken”. The agent asks about anything it could not place, works out whether the meal is light on protein, fibre or healthy fat, and names one practical addition: a boiled egg, a scoop of hummus, a side salad. Then it tells you why.</p>
+<p>Afterwards it asks one question: still hungry, comfortably satisfied, or too full? That single answer is the only thing it learns from.</p>
+
+<h2>The model runs the conversation. It does not make the recommendation.</h2>
+<p>The AssemblyAI Voice Agent API delivers tool calls to the app over the same connection that carries the audio. So the recommendation engine — a few hundred lines of deterministic code with no network access — runs on your own device, registered as the agent’s tools.</p>
+<p>The model decides <em>when</em> to ask a question and <em>how</em> to say the answer. It never decides what to recommend. The same plate always gives the same suggestion, and you can read the rule that produced it.</p>
+<div class="callout">
+<p>A language model asked for nutrition advice will invent some — confidently, fluently, differently each time. This one cannot. The only additions it can name are the ones the engine returned.</p>
+</div>
+
+<h2>What it is not</h2>
+<p>Not a calorie tracker. Not a diet. Not a food diary. Not medical advice — see the <a href="terms.html">terms</a>.</p>
+
+<h2>Privacy</h2>
+<p>No account, no sign-in, no analytics, no ads. Your meals, your goal and your history stay on your device. The two things that cost money to run — photographing a meal and having a plate drawn — send one photo or one list of food names to be read or drawn, and then it is discarded. Read the full <a href="privacy.html">privacy policy</a>, or see how to <a href="delete-data.html">delete your data</a>.</p>
+
+<h2>Open source</h2>
+<p>Plate One is MIT licensed, and the whole thing — app, Worker, tests — is public. Built for the <a href="https://lablab.ai/event/assemblyai-voice-agent-hackathon">AssemblyAI Voice Agent Hackathon</a> on lablab.ai.</p>
+
+<nav><a href="index.html">Home</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="delete-data.html">Delete data</a></nav>
+</div>
+</body>
+</html>

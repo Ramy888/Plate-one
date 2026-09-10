@@ -1,0 +1,83 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "plateone-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-06",
+
+  "observability": {
+    "enabled": true,
+    "traces": { "enabled": true }
+  },
+
+  // Create with `npx wrangler d1 create plateone` and paste the id it prints.
+  // It is per-account, so it cannot be shipped in a public repo.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "plateone",
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Generated pictures only. A lifecycle rule on the bucket deletes anything
+  // under p/ after 24 hours, so expiry is enforced by infrastructure rather
+  // than by remembering to call delete.
+  // Create with `npx wrangler r2 bucket create plateone-previews`.
+  "r2_buckets": [
+    { "binding": "PREVIEWS", "bucket_name": "plateone-previews" }
+  ],
+
+  // Flux draws the plate. Workers AI has no local simulator, so the binding is
+  // marked remote: `wrangler dev` then calls the real thing — which costs real
+  // money in local dev too. The tests mock it.
+  "ai": { "binding": "AI", "remote": true },
+
+  // QUOTA: one instance per device. Spending is a read-modify-write race, and a
+  // Durable Object is single-threaded per id, so two requests cannot both spend
+  // the last scan.
+  //
+  // GLOBAL_CAP: exactly one instance, for the whole deployment. Per-device
+  // limits stop one phone running up a bill; they do nothing about a hundred
+  // phones or a script rotating device ids. This is what stands between a
+  // public demo URL and an empty API account.
+  "durable_objects": {
+    "bindings": [
+      { "name": "QUOTA", "class_name": "QuotaCounter" },
+      { "name": "GLOBAL_CAP", "class_name": "GlobalCap" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["QuotaCounter", "GlobalCap"] }
+  ],
+
+  "vars": {
+    "MODEL_VISION": "gemini-3.7-flash",
+    "MODEL_IMAGE": "gemini-3.1-flash-image",
+
+    // Gemini writes the words, Workers AI draws the plate. Flux is an order of
+    // magnitude cheaper per image than the Gemini image model, which is why the
+    // written-up plate uses it and the photo-editing preview does not.
+    "MODEL_CHAT": "gemini-3.7-flash",
+    "MODEL_CHAT_IMAGE": "@cf/black-forest-labs/flux-1-schnell",
+
+    // Optional. When set, Gemini calls route through AI Gateway for logging,
+    // cost analytics and a rate ceiling. Empty means call Google directly —
+    // the key stays server-side either way.
+    "AI_GATEWAY_ID": "",
+    "CF_ACCOUNT_ID": "",
+
+    // Per device, per day. There is no paid tier: these are spend ceilings, not
+    // a monetisation lever.
+    "SCANS_PER_DAY": "8",
+    "PREVIEWS_PER_DAY": "4",
+
+    // Across every device, per day. The number that actually protects the
+    // budget. Lower it before sharing the URL widely; raise it for a demo.
+    "GLOBAL_CALLS_PER_DAY": "2000"
+  }
+
+  // Secrets, set with `wrangler secret put`:
+  //   ASSEMBLYAI_API_KEY   AssemblyAI key. Never reaches the client.
+  //   GEMINI_API_KEY       Google AI Studio key.
+}

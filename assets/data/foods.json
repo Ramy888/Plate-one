@@ -1,0 +1,1007 @@
+[
+  {
+    "id": "white_rice",
+    "name": "Rice",
+    "emoji": "🍚",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 0,
+      "fat": 0
+    },
+    "tags": [
+      "carb",
+      "plant",
+      "gluten_free"
+    ],
+    "icon": "cooking-pot",
+    "group": "grains"
+  },
+  {
+    "id": "pasta",
+    "name": "Pasta",
+    "emoji": "🍝",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 1,
+      "fibre": 0,
+      "fat": 0
+    },
+    "tags": [
+      "carb",
+      "plant",
+      "gluten"
+    ],
+    "icon": "wheat",
+    "group": "grains"
+  },
+  {
+    "id": "white_bread",
+    "name": "White bread",
+    "emoji": "🍞",
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "provides": {
+      "protein": 1,
+      "fibre": 0,
+      "fat": 0
+    },
+    "tags": [
+      "carb",
+      "plant",
+      "gluten"
+    ],
+    "icon": "sandwich",
+    "group": "grains"
+  },
+  {
+    "id": "whole_grain_bread",
+    "name": "Whole-grain bread",
+    "emoji": "🥖",
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "provides": {
+      "protein": 1,
+      "fibre": 2,
+      "fat": 0
+    },
+    "tags": [
+      "carb",
+      "plant",
+      "gluten"
+    ],
+    "icon": "wheat",
+    "group": "grains"
+  },
+  {
+    "id": "potatoes",
+    "name": "Potatoes",
+    "emoji": "🥔",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 1,
+      "fat": 0
+    },
+    "tags": [
+      "carb",
+      "plant"
+    ],
+    "icon": "carrot",
+    "group": "grains"
+  },
+  {
+    "id": "fries",
+    "name": "Fries",
+    "emoji": "🍟",
+    "slots": [
+      "lunch_dinner",
+      "snack"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 1,
+      "fat": 0
+    },
+    "tags": [
+      "carb",
+      "plant"
+    ],
+    "icon": "utensils",
+    "group": "grains"
+  },
+  {
+    "id": "chicken",
+    "name": "Chicken",
+    "emoji": "🍗",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 3,
+      "fibre": 0,
+      "fat": 1
+    },
+    "tags": [
+      "meat"
+    ],
+    "icon": "drumstick",
+    "group": "protein"
+  },
+  {
+    "id": "red_meat",
+    "name": "Beef or lamb",
+    "emoji": "🥩",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 3,
+      "fibre": 0,
+      "fat": 1
+    },
+    "tags": [
+      "meat"
+    ],
+    "icon": "beef",
+    "group": "protein"
+  },
+  {
+    "id": "fish",
+    "name": "Fish",
+    "emoji": "🐟",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 3,
+      "fibre": 0,
+      "fat": 3
+    },
+    "tags": [
+      "fish"
+    ],
+    "icon": "fish",
+    "group": "protein"
+  },
+  {
+    "id": "eggs",
+    "name": "Eggs",
+    "emoji": "🥚",
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 0,
+      "fat": 2
+    },
+    "tags": [
+      "egg",
+      "vegetarian"
+    ],
+    "icon": "egg",
+    "group": "protein"
+  },
+  {
+    "id": "cheese",
+    "name": "Cheese",
+    "emoji": "🧀",
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 0,
+      "fat": 1
+    },
+    "tags": [
+      "dairy",
+      "vegetarian"
+    ],
+    "icon": "milk",
+    "group": "dairy"
+  },
+  {
+    "id": "yogurt",
+    "name": "Yogurt",
+    "emoji": "🥣",
+    "slots": [
+      "breakfast",
+      "snack"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 0,
+      "fat": 1
+    },
+    "tags": [
+      "dairy",
+      "vegetarian"
+    ],
+    "icon": "ice-cream-bowl",
+    "group": "dairy"
+  },
+  {
+    "id": "milk",
+    "name": "Milk",
+    "emoji": "🥛",
+    "slots": [
+      "breakfast",
+      "snack"
+    ],
+    "provides": {
+      "protein": 1,
+      "fibre": 0,
+      "fat": 1
+    },
+    "tags": [
+      "dairy",
+      "vegetarian"
+    ],
+    "icon": "milk",
+    "group": "dairy"
+  },
+  {
+    "id": "cereal",
+    "name": "Cereal",
+    "emoji": "🥣",
+    "slots": [
+      "breakfast"
+    ],
+    "provides": {
+      "protein": 1,
+      "fibre": 0,
+      "fat": 0
+    },
+    "tags": [
+      "carb",
+      "plant",
+      "gluten"
+    ],
+    "icon": "wheat",
+    "group": "grains"
+  },
+  {
+    "id": "oats",
+    "name": "Oats",
+    "emoji": "🌾",
+    "slots": [
+      "breakfast"
+    ],
+    "provides": {
+      "protein": 1,
+      "fibre": 2,
+      "fat": 0
+    },
+    "tags": [
+      "carb",
+      "plant"
+    ],
+    "icon": "wheat",
+    "group": "grains"
+  },
+  {
+    "id": "jam_honey",
+    "name": "Jam or honey",
+    "emoji": "🍯",
+    "slots": [
+      "breakfast",
+      "snack"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 0,
+      "fat": 0
+    },
+    "tags": [
+      "sweet",
+      "vegetarian"
+    ],
+    "icon": "candy",
+    "group": "sweets"
+  },
+  {
+    "id": "butter",
+    "name": "Butter",
+    "emoji": "🧈",
+    "slots": [
+      "breakfast",
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 0,
+      "fat": 0
+    },
+    "tags": [
+      "dairy",
+      "vegetarian"
+    ],
+    "icon": "croissant",
+    "group": "dairy"
+  },
+  {
+    "id": "beans",
+    "name": "Beans",
+    "emoji": "🫘",
+    "slots": [
+      "breakfast",
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 3,
+      "fat": 0
+    },
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "icon": "bean",
+    "group": "veg"
+  },
+  {
+    "id": "lentils",
+    "name": "Lentils",
+    "emoji": "🍲",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 3,
+      "fat": 0
+    },
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "icon": "soup",
+    "group": "veg"
+  },
+  {
+    "id": "salad",
+    "name": "Salad",
+    "emoji": "🥗",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 2,
+      "fat": 0
+    },
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "icon": "salad",
+    "group": "veg"
+  },
+  {
+    "id": "cooked_veg",
+    "name": "Cooked vegetables",
+    "emoji": "🥦",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 2,
+      "fat": 0
+    },
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "icon": "carrot",
+    "group": "veg"
+  },
+  {
+    "id": "soup",
+    "name": "Soup",
+    "emoji": "🍜",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 1,
+      "fat": 0
+    },
+    "tags": [
+      "vegetarian"
+    ],
+    "icon": "soup",
+    "group": "veg"
+  },
+  {
+    "id": "pizza",
+    "name": "Pizza",
+    "emoji": "🍕",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 0,
+      "fat": 1
+    },
+    "tags": [
+      "dairy",
+      "gluten"
+    ],
+    "icon": "pizza",
+    "group": "dishes"
+  },
+  {
+    "id": "burger",
+    "name": "Burger",
+    "emoji": "🍔",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 3,
+      "fibre": 0,
+      "fat": 1
+    },
+    "tags": [
+      "meat",
+      "gluten"
+    ],
+    "icon": "beef",
+    "group": "dishes"
+  },
+  {
+    "id": "sandwich",
+    "name": "Sandwich",
+    "emoji": "🥪",
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "provides": {
+      "protein": 1,
+      "fibre": 0,
+      "fat": 0
+    },
+    "tags": [
+      "gluten"
+    ],
+    "icon": "sandwich",
+    "group": "dishes"
+  },
+  {
+    "id": "fruit",
+    "name": "Fruit",
+    "emoji": "🍎",
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 2,
+      "fat": 0
+    },
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "icon": "apple",
+    "group": "fruit"
+  },
+  {
+    "id": "banana",
+    "name": "Banana",
+    "emoji": "🍌",
+    "slots": [
+      "breakfast",
+      "snack"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 1,
+      "fat": 0
+    },
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "icon": "banana",
+    "group": "fruit"
+  },
+  {
+    "id": "nuts",
+    "name": "Nuts",
+    "emoji": "🥜",
+    "slots": [
+      "breakfast",
+      "snack"
+    ],
+    "provides": {
+      "protein": 1,
+      "fibre": 1,
+      "fat": 3
+    },
+    "tags": [
+      "plant",
+      "vegetarian",
+      "nuts"
+    ],
+    "icon": "nut",
+    "group": "fruit"
+  },
+  {
+    "id": "biscuits",
+    "name": "Biscuits",
+    "emoji": "🍪",
+    "slots": [
+      "snack"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 0,
+      "fat": 0
+    },
+    "tags": [
+      "sweet",
+      "gluten"
+    ],
+    "icon": "cookie",
+    "group": "sweets"
+  },
+  {
+    "id": "crisps",
+    "name": "Crisps",
+    "emoji": "🥔",
+    "slots": [
+      "snack"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 0,
+      "fat": 0
+    },
+    "tags": [
+      "plant"
+    ],
+    "icon": "popcorn",
+    "group": "sweets"
+  },
+  {
+    "id": "chocolate",
+    "name": "Chocolate",
+    "emoji": "🍫",
+    "slots": [
+      "snack"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 0,
+      "fat": 0
+    },
+    "tags": [
+      "sweet",
+      "vegetarian"
+    ],
+    "icon": "candy",
+    "group": "sweets"
+  },
+  {
+    "id": "popcorn",
+    "name": "Popcorn",
+    "emoji": "🍿",
+    "slots": [
+      "snack"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 2,
+      "fat": 0
+    },
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "icon": "popcorn",
+    "group": "sweets"
+  },
+  {
+    "id": "cake",
+    "name": "Cake or pastry",
+    "emoji": "🍰",
+    "slots": [
+      "breakfast",
+      "snack"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 0,
+      "fat": 0
+    },
+    "tags": [
+      "sweet",
+      "gluten"
+    ],
+    "icon": "cake-slice",
+    "group": "sweets"
+  },
+  {
+    "id": "coffee_tea",
+    "name": "Coffee or tea",
+    "emoji": "☕",
+    "slots": [
+      "breakfast",
+      "snack"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 0,
+      "fat": 0
+    },
+    "tags": [
+      "drink"
+    ],
+    "icon": "coffee",
+    "group": "drinks"
+  },
+  {
+    "id": "fuul",
+    "name": "Fuul medames",
+    "emoji": "🫘",
+    "slots": [
+      "breakfast",
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 3,
+      "fat": 1
+    },
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "collection": "mena",
+    "icon": "bean",
+    "group": "dishes"
+  },
+  {
+    "id": "taameya",
+    "name": "Taameya or falafel",
+    "emoji": "🧆",
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 2,
+      "fat": 1
+    },
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "collection": "mena",
+    "icon": "bean",
+    "group": "dishes"
+  },
+  {
+    "id": "koshari",
+    "name": "Koshari",
+    "emoji": "🍛",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 3,
+      "fat": 0
+    },
+    "tags": [
+      "plant",
+      "vegetarian",
+      "gluten"
+    ],
+    "collection": "mena",
+    "icon": "cooking-pot",
+    "group": "dishes"
+  },
+  {
+    "id": "molokhia",
+    "name": "Molokhia",
+    "emoji": "🥬",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 2,
+      "fat": 0
+    },
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "collection": "mena",
+    "icon": "salad",
+    "group": "veg"
+  },
+  {
+    "id": "mahshi",
+    "name": "Mahshi",
+    "emoji": "🫑",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 1,
+      "fibre": 2,
+      "fat": 0
+    },
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "collection": "mena",
+    "icon": "carrot",
+    "group": "veg"
+  },
+  {
+    "id": "shawarma",
+    "name": "Shawarma",
+    "emoji": "🌯",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 3,
+      "fibre": 0,
+      "fat": 1
+    },
+    "tags": [
+      "meat",
+      "gluten"
+    ],
+    "collection": "mena",
+    "icon": "beef",
+    "group": "dishes"
+  },
+  {
+    "id": "baladi_bread",
+    "name": "Baladi bread",
+    "emoji": "🫓",
+    "slots": [
+      "breakfast",
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 1,
+      "fibre": 2,
+      "fat": 0
+    },
+    "tags": [
+      "carb",
+      "plant",
+      "gluten"
+    ],
+    "collection": "mena",
+    "icon": "croissant",
+    "group": "grains"
+  },
+  {
+    "id": "dates",
+    "name": "Dates",
+    "emoji": "🌴",
+    "slots": [
+      "breakfast",
+      "snack"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 2,
+      "fat": 0
+    },
+    "tags": [
+      "plant",
+      "vegetarian",
+      "sweet"
+    ],
+    "collection": "mena",
+    "icon": "grape",
+    "group": "fruit"
+  },
+  {
+    "id": "roz_bel_laban",
+    "name": "Roz bel laban",
+    "emoji": "🍮",
+    "slots": [
+      "snack"
+    ],
+    "provides": {
+      "protein": 1,
+      "fibre": 0,
+      "fat": 1
+    },
+    "tags": [
+      "dairy",
+      "vegetarian",
+      "sweet"
+    ],
+    "collection": "mena",
+    "icon": "ice-cream-bowl",
+    "group": "sweets"
+  },
+  {
+    "id": "sushi",
+    "name": "Sushi",
+    "emoji": "🍣",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 0,
+      "fat": 2
+    },
+    "tags": [
+      "fish"
+    ],
+    "collection": "world",
+    "icon": "fish",
+    "group": "dishes"
+  },
+  {
+    "id": "ramen",
+    "name": "Ramen",
+    "emoji": "🍜",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 1,
+      "fibre": 0,
+      "fat": 1
+    },
+    "tags": [
+      "gluten"
+    ],
+    "collection": "world",
+    "icon": "soup",
+    "group": "dishes"
+  },
+  {
+    "id": "tacos",
+    "name": "Tacos",
+    "emoji": "🌮",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 1,
+      "fat": 1
+    },
+    "tags": [
+      "meat"
+    ],
+    "collection": "world",
+    "icon": "sandwich",
+    "group": "dishes"
+  },
+  {
+    "id": "curry",
+    "name": "Curry",
+    "emoji": "🍛",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 2,
+      "fat": 1
+    },
+    "tags": [],
+    "collection": "world",
+    "icon": "cooking-pot",
+    "group": "dishes"
+  },
+  {
+    "id": "stir_fry",
+    "name": "Vegetable stir-fry",
+    "emoji": "🥘",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 0,
+      "fibre": 2,
+      "fat": 1
+    },
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "collection": "world",
+    "icon": "carrot",
+    "group": "veg"
+  },
+  {
+    "id": "pho",
+    "name": "Pho",
+    "emoji": "🍲",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 1,
+      "fat": 0
+    },
+    "tags": [
+      "meat"
+    ],
+    "collection": "world",
+    "icon": "soup",
+    "group": "dishes"
+  },
+  {
+    "id": "paella",
+    "name": "Paella",
+    "emoji": "🥘",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 1,
+      "fat": 1
+    },
+    "tags": [
+      "fish"
+    ],
+    "collection": "world",
+    "icon": "cooking-pot",
+    "group": "dishes"
+  },
+  {
+    "id": "burrito_bowl",
+    "name": "Burrito bowl",
+    "emoji": "🥙",
+    "slots": [
+      "lunch_dinner"
+    ],
+    "provides": {
+      "protein": 2,
+      "fibre": 2,
+      "fat": 1
+    },
+    "tags": [],
+    "collection": "world",
+    "icon": "sandwich",
+    "group": "dishes"
+  }
+]

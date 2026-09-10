@@ -1,0 +1,701 @@
+[
+  {
+    "id": "yogurt",
+    "name": "Add a small bowl of yogurt",
+    "emoji": "🥣",
+    "provides": {
+      "protein": 3,
+      "fibre": 0,
+      "fat": 1
+    },
+    "speed": 1,
+    "cost": 1,
+    "tags": [
+      "dairy",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "Plain yogurt, about half a cup, on the side.",
+    "icon": "ice-cream-bowl"
+  },
+  {
+    "id": "boiled_egg",
+    "name": "Add a boiled egg",
+    "emoji": "🥚",
+    "provides": {
+      "protein": 3,
+      "fibre": 0,
+      "fat": 2
+    },
+    "speed": 2,
+    "cost": 1,
+    "tags": [
+      "egg",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "One egg. Boil a few at once and keep them in the fridge.",
+    "icon": "egg"
+  },
+  {
+    "id": "beans",
+    "name": "Add beans or lentils",
+    "emoji": "🫘",
+    "provides": {
+      "protein": 3,
+      "fibre": 3,
+      "fat": 0
+    },
+    "speed": 2,
+    "cost": 1,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "lunch_dinner"
+    ],
+    "how": "Half a cup, tinned is fine. Rinse and warm through.",
+    "icon": "bean"
+  },
+  {
+    "id": "nuts",
+    "name": "Add a small handful of nuts",
+    "emoji": "🥜",
+    "provides": {
+      "protein": 2,
+      "fibre": 2,
+      "fat": 3
+    },
+    "speed": 1,
+    "cost": 2,
+    "tags": [
+      "plant",
+      "vegetarian",
+      "nuts"
+    ],
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "What fits in a cupped palm. No need to measure.",
+    "icon": "nut"
+  },
+  {
+    "id": "fruit",
+    "name": "Add a piece of fruit",
+    "emoji": "🍎",
+    "provides": {
+      "protein": 0,
+      "fibre": 3,
+      "fat": 0
+    },
+    "speed": 1,
+    "cost": 1,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "Whatever is in the bowl. Eat the skin where you can.",
+    "icon": "apple"
+  },
+  {
+    "id": "side_salad",
+    "name": "Add a side salad",
+    "emoji": "🥗",
+    "provides": {
+      "protein": 0,
+      "fibre": 3,
+      "fat": 0
+    },
+    "speed": 2,
+    "cost": 1,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "lunch_dinner"
+    ],
+    "how": "Tomato, cucumber, a squeeze of lemon. Two minutes.",
+    "icon": "salad"
+  },
+  {
+    "id": "cheese_slice",
+    "name": "Add a slice of cheese",
+    "emoji": "🧀",
+    "provides": {
+      "protein": 2,
+      "fibre": 0,
+      "fat": 2
+    },
+    "speed": 1,
+    "cost": 2,
+    "tags": [
+      "dairy",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "One slice, or a piece about the size of two fingers.",
+    "icon": "milk"
+  },
+  {
+    "id": "whole_grain_swap",
+    "name": "Swap in whole-grain bread",
+    "emoji": "🥖",
+    "provides": {
+      "protein": 1,
+      "fibre": 3,
+      "fat": 0
+    },
+    "speed": 1,
+    "cost": 1,
+    "tags": [
+      "plant",
+      "vegetarian",
+      "gluten"
+    ],
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "Same slice, browner loaf. That is the whole change.",
+    "icon": "wheat"
+  },
+  {
+    "id": "tuna",
+    "name": "Add a small tin of tuna",
+    "emoji": "🐟",
+    "provides": {
+      "protein": 3,
+      "fibre": 0,
+      "fat": 3
+    },
+    "speed": 1,
+    "cost": 2,
+    "tags": [
+      "fish"
+    ],
+    "slots": [
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "Half a tin, drained. Works straight from the cupboard.",
+    "icon": "fish"
+  },
+  {
+    "id": "grilled_chicken",
+    "name": "Add a piece of grilled chicken",
+    "emoji": "🍗",
+    "provides": {
+      "protein": 3,
+      "fibre": 0,
+      "fat": 1
+    },
+    "speed": 3,
+    "cost": 2,
+    "tags": [
+      "meat"
+    ],
+    "slots": [
+      "lunch_dinner"
+    ],
+    "how": "A piece about the size of your palm.",
+    "icon": "drumstick"
+  },
+  {
+    "id": "olive_oil",
+    "name": "Drizzle over some olive oil",
+    "emoji": "🫒",
+    "provides": {
+      "protein": 0,
+      "fibre": 0,
+      "fat": 3
+    },
+    "speed": 1,
+    "cost": 1,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "About a tablespoon, straight over the top.",
+    "icon": "droplet"
+  },
+  {
+    "id": "avocado",
+    "name": "Add a few slices of avocado",
+    "emoji": "🥑",
+    "provides": {
+      "protein": 1,
+      "fibre": 3,
+      "fat": 3
+    },
+    "speed": 2,
+    "cost": 3,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "Half an avocado, sliced over whatever you have.",
+    "icon": "salad"
+  },
+  {
+    "id": "glass_of_milk",
+    "name": "Add a glass of milk",
+    "emoji": "🥛",
+    "provides": {
+      "protein": 2,
+      "fibre": 0,
+      "fat": 1
+    },
+    "speed": 1,
+    "cost": 1,
+    "tags": [
+      "dairy",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "snack"
+    ],
+    "how": "One glass, alongside the meal.",
+    "icon": "milk"
+  },
+  {
+    "id": "veg_side",
+    "name": "Add a side of cooked vegetables",
+    "emoji": "🥦",
+    "provides": {
+      "protein": 0,
+      "fibre": 3,
+      "fat": 0
+    },
+    "speed": 3,
+    "cost": 1,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "lunch_dinner"
+    ],
+    "how": "Whatever is in the freezer. Steam or pan-fry briefly.",
+    "icon": "carrot"
+  },
+  {
+    "id": "seeds",
+    "name": "Sprinkle on some seeds",
+    "emoji": "🌻",
+    "provides": {
+      "protein": 1,
+      "fibre": 2,
+      "fat": 3
+    },
+    "speed": 1,
+    "cost": 2,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "A teaspoon of sunflower, pumpkin or sesame seeds.",
+    "icon": "sprout"
+  },
+  {
+    "id": "peanut_butter",
+    "name": "Add a spoon of peanut butter",
+    "emoji": "🥜",
+    "provides": {
+      "protein": 2,
+      "fibre": 1,
+      "fat": 3
+    },
+    "speed": 1,
+    "cost": 1,
+    "tags": [
+      "plant",
+      "vegetarian",
+      "nuts"
+    ],
+    "slots": [
+      "breakfast",
+      "snack"
+    ],
+    "how": "One heaped spoon. Look for one with no added sugar.",
+    "icon": "nut"
+  },
+  {
+    "id": "hummus",
+    "name": "Add a scoop of hummus",
+    "emoji": "🧆",
+    "provides": {
+      "protein": 2,
+      "fibre": 3,
+      "fat": 2
+    },
+    "speed": 1,
+    "cost": 2,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "Two spoons, on the side or spread on the bread.",
+    "icon": "bean"
+  },
+  {
+    "id": "oats_stir",
+    "name": "Stir in a spoon of oats",
+    "emoji": "🌾",
+    "provides": {
+      "protein": 1,
+      "fibre": 3,
+      "fat": 0
+    },
+    "speed": 2,
+    "cost": 1,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast"
+    ],
+    "how": "One spoon into yogurt or milk. Let it sit a minute.",
+    "icon": "wheat"
+  },
+  {
+    "id": "cottage_cheese",
+    "name": "Add a scoop of cottage cheese",
+    "emoji": "🥛",
+    "provides": {
+      "protein": 3,
+      "fibre": 0,
+      "fat": 1
+    },
+    "speed": 1,
+    "cost": 2,
+    "tags": [
+      "dairy",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "Three or four spoons, sweet or savoury.",
+    "collection": "pro",
+    "icon": "milk"
+  },
+  {
+    "id": "edamame",
+    "name": "Add a bowl of edamame",
+    "emoji": "🫛",
+    "provides": {
+      "protein": 3,
+      "fibre": 3,
+      "fat": 1
+    },
+    "speed": 2,
+    "cost": 2,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "A handful from frozen, two minutes in hot water.",
+    "collection": "pro",
+    "icon": "bean"
+  },
+  {
+    "id": "roast_chickpeas",
+    "name": "Add roasted chickpeas",
+    "emoji": "🫘",
+    "provides": {
+      "protein": 2,
+      "fibre": 3,
+      "fat": 1
+    },
+    "speed": 3,
+    "cost": 1,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "Tinned chickpeas, oil, oven. Make a batch for the week.",
+    "collection": "pro",
+    "icon": "bean"
+  },
+  {
+    "id": "smoked_salmon",
+    "name": "Add a slice of smoked salmon",
+    "emoji": "🐠",
+    "provides": {
+      "protein": 3,
+      "fibre": 0,
+      "fat": 3
+    },
+    "speed": 1,
+    "cost": 3,
+    "tags": [
+      "fish"
+    ],
+    "slots": [
+      "breakfast",
+      "lunch_dinner"
+    ],
+    "how": "One or two slices, straight from the pack.",
+    "collection": "pro",
+    "icon": "fish"
+  },
+  {
+    "id": "kefir",
+    "name": "Add a glass of kefir",
+    "emoji": "🥛",
+    "provides": {
+      "protein": 2,
+      "fibre": 0,
+      "fat": 1
+    },
+    "speed": 1,
+    "cost": 2,
+    "tags": [
+      "dairy",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "snack"
+    ],
+    "how": "One small glass. Tangier than milk, same idea.",
+    "collection": "pro",
+    "icon": "milk"
+  },
+  {
+    "id": "chia",
+    "name": "Stir in a spoon of chia seeds",
+    "emoji": "⚫",
+    "provides": {
+      "protein": 1,
+      "fibre": 3,
+      "fat": 3
+    },
+    "speed": 2,
+    "cost": 2,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "snack"
+    ],
+    "how": "One spoon into liquid, leave ten minutes to thicken.",
+    "collection": "pro",
+    "icon": "sprout"
+  },
+  {
+    "id": "tahini",
+    "name": "Drizzle over some tahini",
+    "emoji": "🥄",
+    "provides": {
+      "protein": 1,
+      "fibre": 2,
+      "fat": 3
+    },
+    "speed": 1,
+    "cost": 1,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "A spoon, loosened with lemon and a little water.",
+    "collection": "pro",
+    "icon": "droplet"
+  },
+  {
+    "id": "labneh",
+    "name": "Add a spoon of labneh",
+    "emoji": "🍚",
+    "provides": {
+      "protein": 3,
+      "fibre": 0,
+      "fat": 2
+    },
+    "speed": 1,
+    "cost": 2,
+    "tags": [
+      "dairy",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "A generous spoon, with olive oil over the top.",
+    "collection": "pro",
+    "icon": "ice-cream-bowl"
+  },
+  {
+    "id": "fuul_side",
+    "name": "Add a small bowl of fuul",
+    "emoji": "🫘",
+    "provides": {
+      "protein": 3,
+      "fibre": 3,
+      "fat": 1
+    },
+    "speed": 2,
+    "cost": 1,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "lunch_dinner"
+    ],
+    "how": "Half a cup, with cumin, lemon and oil.",
+    "collection": "pro",
+    "icon": "bean"
+  },
+  {
+    "id": "lentil_soup",
+    "name": "Add a cup of lentil soup",
+    "emoji": "🍲",
+    "provides": {
+      "protein": 2,
+      "fibre": 3,
+      "fat": 0
+    },
+    "speed": 3,
+    "cost": 1,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "lunch_dinner"
+    ],
+    "how": "One cup on the side. Freezes well in portions.",
+    "collection": "pro",
+    "icon": "soup"
+  },
+  {
+    "id": "greek_yogurt",
+    "name": "Add a bowl of Greek yogurt",
+    "emoji": "🍦",
+    "provides": {
+      "protein": 3,
+      "fibre": 0,
+      "fat": 2
+    },
+    "speed": 1,
+    "cost": 2,
+    "tags": [
+      "dairy",
+      "vegetarian"
+    ],
+    "slots": [
+      "breakfast",
+      "snack"
+    ],
+    "how": "Half a cup. Thicker and higher in protein than plain.",
+    "collection": "pro",
+    "icon": "ice-cream-bowl"
+  },
+  {
+    "id": "sardines",
+    "name": "Add a tin of sardines",
+    "emoji": "🐟",
+    "provides": {
+      "protein": 3,
+      "fibre": 0,
+      "fat": 3
+    },
+    "speed": 1,
+    "cost": 1,
+    "tags": [
+      "fish"
+    ],
+    "slots": [
+      "lunch_dinner",
+      "snack"
+    ],
+    "how": "Half a tin on toast or straight on the plate.",
+    "collection": "pro",
+    "icon": "fish"
+  },
+  {
+    "id": "frozen_peas",
+    "name": "Stir through a scoop of peas",
+    "emoji": "🟢",
+    "provides": {
+      "protein": 2,
+      "fibre": 3,
+      "fat": 0
+    },
+    "speed": 2,
+    "cost": 1,
+    "tags": [
+      "plant",
+      "vegetarian"
+    ],
+    "slots": [
+      "lunch_dinner"
+    ],
+    "how": "A handful from frozen, straight into the pan.",
+    "collection": "pro",
+    "icon": "sprout"
+  }
+]

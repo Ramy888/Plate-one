@@ -1,0 +1,67 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Signing secrets — never commit
+android/key.properties
+android/*.jks
+android/*.keystore
+*.jks
+*.keystore
+
+# Wrangler / node tooling for the docs site deploy
+node_modules/
+.wrangler/
+
+# Local secrets — never commit. Gemini key lives here for local dev only;
+# production uses `wrangler secret put GEMINI_API_KEY`.
+.env
+.env.*
+!.env.example
+worker/.dev.vars
+# Google Cloud service-account keys. These must never reach a public repo.
+gen-lang-client-*.json
+*-service-account*.json
+service-account*.json

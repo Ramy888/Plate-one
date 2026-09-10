@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy policy · Plate One</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+<header><div class="mark">P</div><strong>Plate One</strong></header>
+
+<h1>Privacy policy</h1>
+<p class="meta">Last updated 10 September 2026</p>
+
+<h2>The short version</h2>
+<p>Your meals, your goal, your preferences and your history stay on your device and are never uploaded. <strong>There is no account, no sign-in and nothing to create.</strong> The exceptions are the two things that cost money to run &mdash; photographing a meal, and having a plate drawn. Those send one photo, or one list of food names, to be read or drawn, and then it is discarded. Everything else works with no network at all.</p>
+
+<h2>What is stored on your device</h2>
+<p>Your goal, your dietary and budget preferences, the meals you have saved, your after-meal check answers, and the picture drawn for each patch you saved. All of it lives in the app&rsquo;s own storage and none of it is uploaded. Removing a saved patch deletes its picture with it, and uninstalling Plate One deletes the lot.</p>
+
+<h2>What happens to a photo you scan</h2>
+<p>Before it leaves your device, the photo is cropped to the guide circle, resized, and stripped of all metadata &mdash; so no location, no device model and no timestamp travel with it.</p>
+<p>It is then sent through Plate One&rsquo;s server to Google&rsquo;s Gemini API, which describes the food it can see. <strong>Plate One does not store the photo.</strong> Google processes it under its paid API terms and does not use it to train its models.</p>
+<p>A generated picture is held on our storage for up to <strong>24 hours</strong> so your device can download it, then deleted automatically by a rule on the storage bucket rather than by anyone remembering to do it.</p>
+
+<h2>What happens when you open a result</h2>
+<p>When a result page opens, the <em>names</em> of the foods on the plate and the one addition being suggested are sent to Plate One&rsquo;s server &mdash; nothing else, and no free text. Google&rsquo;s Gemini API writes a sentence about that plate, and Cloudflare Workers AI draws a picture of it from a fixed description built out of the app&rsquo;s own food list. <strong>Neither the list nor the sentence is stored.</strong></p>
+<p>This part is decoration. The suggestion itself is worked out on your device by a fixed set of rules, so the result still tells you what to add with no network at all &mdash; you just do not get the picture.</p>
+
+<h2>The anonymous device id</h2>
+<p>The first time you use one of the two networked features, your device is given a random id. It is not linked to you, to an email address, or to anything Google or Apple knows about you. Its only job is to count how many calls have been made today, so the service cannot be run up by one device.</p>
+<p>Alongside it we keep counts only: how long a call took, whether it succeeded, and how many foods were recognised. Never what the meal was. You can delete the id at any time from Settings, which forgets the device on the server as well as on your device &mdash; see <a href="delete-data.html">deleting your data</a>.</p>
+
+<h2>Who else is involved</h2>
+<ul>
+<li><strong>Google (Gemini API)</strong> &mdash; reads a photo, and writes the sentence about a plate. Processes under its paid API terms; does not train on the data.</li>
+<li><strong>Cloudflare</strong> &mdash; runs the server and draws the pictures (Workers AI), and stores a generated picture for at most 24 hours.</li>
+<li><strong>AssemblyAI</strong> &mdash; will carry the voice conversation when that feature ships. This page will say exactly what leaves your device before it does.</li>
+</ul>
+<p>There are no analytics, no advertising, and no third-party trackers of any kind.</p>
+
+<h2>Children</h2>
+<p>Plate One is not directed at children under 13 and does not knowingly collect anything from them. It is a general-audience app about food.</p>
+
+<h2>Not medical advice</h2>
+<p>Plate One suggests one ordinary food to add to a meal. It is not a dietitian, it does not diagnose anything, and it does not know about your allergies, your medication or any condition you have. If you have one, ask someone qualified rather than an app.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes, the date at the top of this page changes with it.</p>
+
+<h2>Getting in touch</h2>
+<p>Questions about any of this, or a request to delete something, go to the address on the project&rsquo;s repository.</p>
+
+<nav><a href="index.html">Home</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="delete-data.html">Delete data</a></nav>
+</div>
+</body>
+</html>

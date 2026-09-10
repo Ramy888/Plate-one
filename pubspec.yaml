@@ -1,0 +1,64 @@
+name: plateone
+description: "Tell it what is on your plate. It names the one thing to add."
+publish_to: 'none'
+
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^3.3.2
+  shared_preferences: ^2.5.5
+  image: ^4.9.2
+  url_launcher: ^6.3.2
+  package_info_plus: ^10.2.1
+  http: ^1.6.0
+  web_socket_channel: ^3.0.3
+  camera: ^0.12.0+2
+  lucide_icons_flutter: ^3.1.19
+  record: ^6.2.1
+  path_provider: ^2.1.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/data/
+    # The brand mark, for the app bar. Only this one file — the other icon
+    # layers are build inputs for the launcher, not runtime assets.
+    - assets/icon/icon.png
+    - assets/meals/
+
+  # Caprasimo for display, Figtree for everything else — the Organic design
+  # system's pairing. Bundled rather than fetched so the app renders the same
+  # offline and on the first launch. Both are OFL; the licences ship alongside.
+  fonts:
+    - family: Caprasimo
+      fonts:
+        - asset: assets/fonts/Caprasimo-Regular.ttf
+    - family: Figtree
+      fonts:
+        - asset: assets/fonts/Figtree-Regular.ttf
+        - asset: assets/fonts/Figtree-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Figtree-Bold.ttf
+          weight: 700
+
+flutter_launcher_icons:
+  image_path: "assets/icon/icon.png"
+  android: "ic_launcher"
+  adaptive_icon_background: "#56633F"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  adaptive_icon_monochrome: "assets/icon/icon_monochrome.png"
+  min_sdk_android: 24
+  ios: true
+  remove_alpha_ios: true
