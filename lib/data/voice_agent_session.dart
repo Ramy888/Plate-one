@@ -129,15 +129,25 @@ class VoiceAgentSession {
         throw const VoiceFailure('Plate One needs the microphone to listen.');
       }
 
+      // Every await here is a window in which the user can tap stop, and the
+      // session must not open behind them: a socket nobody is watching bills
+      // until the server's own cap.
+      if (_closing) return;
+
       final minted = await _mintToken();
       if (minted.token.isEmpty) {
         throw const VoiceFailure('Voice is not available right now.');
       }
+      if (_closing) return;
 
       final channel = _channel = _connect(
         _endpoint.replace(queryParameters: {'token': minted.token}),
       );
       await channel.ready;
+      if (_closing) {
+        await _teardown();
+        return;
+      }
 
       _socketSubscription = channel.stream.listen(
         _onFrame,
@@ -211,13 +221,15 @@ class VoiceAgentSession {
         unawaited(_openMicrophone());
 
       case SpeechStarted():
-        // Barge-in. The server has already stopped generating; the seconds
-        // sitting in the speaker are now stale.
-        if (_state == VoiceAgentState.speaking) _player.flush();
-        _emitState(VoiceAgentState.listening);
+        // Not a barge-in. Turn detection fires on back-channels too — an
+        // "mm-hmm" while the agent talks — and the server decides semantically
+        // whether that counts. Flushing here would cut the agent off every
+        // time someone agreed with it. The real interruption arrives as
+        // `reply.done` with status `interrupted`.
+        if (_state != VoiceAgentState.speaking) _emitState(VoiceAgentState.listening);
 
       case SpeechStopped():
-        _emitState(VoiceAgentState.thinking);
+        if (_state != VoiceAgentState.speaking) _emitState(VoiceAgentState.thinking);
 
       case ReplyStarted():
         _emitState(VoiceAgentState.speaking);
@@ -245,7 +257,9 @@ class VoiceAgentSession {
         unawaited(_finishCleanly());
 
       case VoiceSessionError():
-        _fail(event.message);
+        // A rejected frame is not a dead session. It is on [events] either
+        // way; only the fatal ones end the conversation.
+        if (event.endsSession) _fail(event.message);
 
       case UserTranscript() ||
             UserTranscriptDelta() ||
@@ -337,9 +351,18 @@ class VoiceAgentSession {
   }
 
   void _fail(String message) {
-    if (_state == VoiceAgentState.ended) return;
+    // A teardown already under way is not a failure. Without this, the
+    // `session.ended` the server sends in reply to our own `session.end`
+    // arrives as "the conversation dropped".
+    if (_closing || _state == VoiceAgentState.ended) return;
     _failure = message;
     _closing = true;
+    // Even on the way out: closing without it leaves 30 billable seconds.
+    try {
+      _channel?.sink.add(VoiceFrame.sessionEnd());
+    } catch (_) {
+      // The socket is what failed. Nothing to send it.
+    }
     unawaited(_teardown().then((_) => _emitState(VoiceAgentState.ended)));
   }
 
@@ -350,6 +373,14 @@ class VoiceAgentSession {
   Future<void> _teardown() async {
     _sessionTimer?.cancel();
     _sessionTimer = null;
+
+    // First, and before any await. The server answers `session.end` with
+    // `session.ended` and a close, and a listener still attached during the
+    // steps below would read that as the conversation dropping.
+    try {
+      await _socketSubscription?.cancel();
+    } catch (_) {}
+    _socketSubscription = null;
 
     try {
       await _micSubscription?.cancel();
@@ -364,11 +395,6 @@ class VoiceAgentSession {
       _player.flush();
       await _player.dispose();
     } catch (_) {}
-
-    try {
-      await _socketSubscription?.cancel();
-    } catch (_) {}
-    _socketSubscription = null;
 
     try {
       // Bounded: releasing a microphone must not wait on a socket that has

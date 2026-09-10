@@ -22,6 +22,9 @@ class FakeSocket extends StreamChannelMixin implements WebSocketChannel {
   bool sinkClosed = false;
   bool readyFails = false;
 
+  /// Whether the server plays its part of a clean teardown.
+  bool answersEnd = true;
+
   void serverSays(Map<String, dynamic> event) => _inbound.add(jsonEncode(event));
   void drop() => _inbound.close();
 
@@ -58,6 +61,21 @@ class _FakeSink implements WebSocketSink {
   void add(dynamic data) {
     if (_socket.sinkClosed) throw StateError('sink is closed');
     _socket.sent.add(data as String);
+
+    // The real server answers `session.end` with `session.ended` and a 1000
+    // close, and it does it while we are still tearing down. That race is
+    // where a clean goodbye gets reported as a dropped conversation.
+    if (jsonDecode(data)['type'] == 'session.end' && _socket.answersEnd) {
+      scheduleMicrotask(() {
+        if (_socket._inbound.isClosed) return;
+        _socket.serverSays({
+          'type': 'session.ended',
+          'session_duration_seconds': 8.0,
+          'audio_duration_seconds': 6.0,
+        });
+        _socket._inbound.close();
+      });
+    }
   }
 
   @override
@@ -235,6 +253,25 @@ void main() {
       expect(session.failure, contains('microphone'));
     });
 
+    test('stopping while connecting never opens the session', () async {
+      // The gap between the tap and the token is a second of real time. A
+      // session opened after the user gave up bills until the server's cap.
+      final minting = Completer<VoiceToken>();
+      final session = build(mint: () => minting.future);
+
+      final starting = session.start();
+      await pumpEventQueue();
+      await session.stop();
+
+      minting.complete(_token());
+      await starting;
+      await pumpEventQueue();
+
+      expect(connectedTo, isEmpty);
+      expect(mic.started, isFalse);
+      expect(session.currentState, VoiceAgentState.ended);
+    });
+
     test('a socket that never opens leaves nothing running', () async {
       socket.readyFails = true;
       final session = build();
@@ -311,11 +348,34 @@ void main() {
       await pumpEventQueue();
       expect(player.flushes, 0);
 
-      // The user talked over it. What is queued answers a question they left.
-      socket.serverSays({'type': 'input.speech.started'});
+      // The server decides what counts as an interruption, and says so here.
+      socket.serverSays({
+        'type': 'reply.done',
+        'reply_id': 'r1',
+        'status': 'interrupted',
+      });
       await pumpEventQueue();
       expect(player.flushes, 1);
       expect(session.currentState, VoiceAgentState.listening);
+
+      await session.dispose();
+    });
+
+    test('an "mm-hmm" over the agent does not cut it off', () async {
+      // Turn detection fires on back-channels too. Treating every one as a
+      // barge-in drops buffered audio mid-sentence while the server keeps
+      // generating — a dropout the user hears and cannot explain.
+      final session = await live();
+      socket.serverSays({'type': 'reply.started', 'reply_id': 'r1'});
+      await pumpEventQueue();
+
+      socket.serverSays({'type': 'input.speech.started'});
+      socket.serverSays({'type': 'input.speech.stopped'});
+      await pumpEventQueue();
+
+      expect(player.flushes, 0);
+      expect(session.currentState, VoiceAgentState.speaking,
+          reason: 'the agent is still talking, and the server has not stopped it');
 
       await session.dispose();
     });
@@ -469,6 +529,33 @@ void main() {
       expect(session.currentState, VoiceAgentState.ended);
     });
 
+    test('a clean goodbye is not reported as a dropped conversation', () async {
+      // The server answers session.end with session.ended and a close, while
+      // we are still releasing the microphone. Read carelessly, that is a
+      // "the conversation dropped" on every normal hang-up.
+      final session = await live();
+      await session.stop();
+      await pumpEventQueue();
+
+      expect(session.failure, isNull);
+      expect(session.currentState, VoiceAgentState.ended);
+    });
+
+    test('a failure still sends session.end', () async {
+      // Otherwise the session sits there billable for another 30 seconds
+      // waiting for a reconnect that is not coming.
+      final session = await live();
+      socket.serverSays({
+        'type': 'session.error',
+        'code': 'session_expired',
+        'message': 'Session duration TTL reached.',
+      });
+      await pumpEventQueue();
+
+      expect(socket.sentOfType('session.end'), hasLength(1));
+      await session.dispose();
+    });
+
     test('a microphone that refuses to close does not strand the socket', () async {
       // Cleanup lives in finally, one guard per step: a failure in the first
       // step is exactly how a socket stays open and a session stays billed.
@@ -506,6 +593,29 @@ void main() {
       expect(session.currentState, VoiceAgentState.ended);
       expect(session.failure, isNotNull);
       expect(mic.stopped, isTrue);
+
+      await session.dispose();
+    });
+
+    test('a rejected frame does not end the conversation', () async {
+      // A tab waking from the background flushes buffered microphone frames
+      // faster than real time. The server rejects them and keeps the session;
+      // ending it here would drop a conversation over a hiccup.
+      final session = await live();
+      final seen = <VoiceEvent>[];
+      session.events.listen(seen.add);
+
+      socket.serverSays({
+        'type': 'session.error',
+        'code': 'audio_rate_violation',
+        'message': 'Audio streamed faster than real time.',
+      });
+      await pumpEventQueue();
+
+      expect(session.currentState, VoiceAgentState.listening);
+      expect(session.failure, isNull);
+      expect(seen.single, isA<VoiceSessionError>(),
+          reason: 'still worth surfacing, just not worth ending over');
 
       await session.dispose();
     });

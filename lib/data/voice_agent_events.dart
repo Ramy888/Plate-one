@@ -199,6 +199,27 @@ final class VoiceSessionError extends VoiceEvent {
   static const _retryable = {'at_capacity', 'concurrency_exceeded', 'internal_error'};
 
   bool get isRetryable => _retryable.contains(code);
+
+  /// Errors the server sends on a socket it intends to keep open — a rejected
+  /// frame, not a dead session. `audio_rate_violation` is the one that matters:
+  /// a backgrounded tab wakes up and flushes buffered microphone frames faster
+  /// than real time, and ending the conversation over that would be absurd.
+  static const _survivable = {
+    'invalid_format',
+    'invalid_audio',
+    'invalid_value',
+    'immutable_field',
+    'invalid_config',
+    'agent_id_not_first',
+    'agent_not_found',
+    'audio_rate_violation',
+  };
+
+  /// Whether the conversation is over. `session_expired` is deliberately not
+  /// survivable, and `server_error` is ambiguous in the docs — it is treated as
+  /// fatal, because the expensive mistake is holding a session open, not
+  /// ending one early.
+  bool get endsSession => !_survivable.contains(code);
 }
 
 /// An event this version does not know about. Carried, not thrown.
