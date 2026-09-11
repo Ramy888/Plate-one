@@ -157,7 +157,7 @@ void main() {
     await openHome(tester);
     // Idle is the plate and the microphone, and nothing else. There is no
     // transcript yet and no empty panel pretending to be one.
-    expect(find.text('Tap to talk'), findsOneWidget);
+    expect(find.text('Describe your meal'), findsOneWidget);
     expect(find.byType(MicButton), findsOneWidget);
     expect(find.textContaining('Tap the microphone'), findsNothing);
     expect(session.started, isFalse, reason: 'nothing is spent by arriving');
@@ -181,7 +181,9 @@ void main() {
       (VoiceAgentState.listening, 'Listening'),
       (VoiceAgentState.thinking, 'Thinking'),
       (VoiceAgentState.speaking, 'Speaking'),
-      (VoiceAgentState.ended, 'Ended'),
+      // Ended reads the same as idle, because it is the same: an empty plate
+      // waiting to be told about.
+      (VoiceAgentState.ended, 'Describe your meal'),
     ]) {
       session.becomes(next);
       // Twice: the state arrives on a stream, and the frame that renders it
@@ -475,7 +477,7 @@ void main() {
     expect(container.read(chosenPatchProvider), isNull);
     expect(container.read(mealDraftProvider).foodIds, isEmpty);
     // Back to idle: the plate, the microphone, and nothing else.
-    expect(find.text('Tap to talk'), findsOneWidget);
+    expect(find.text('Describe your meal'), findsOneWidget);
   });
 
   testWidgets('keeping the plate says so, then clears the screen', (tester) async {
@@ -495,6 +497,12 @@ void main() {
     await tester.pump();
     await tester.pump();
 
+    // A toast the width of its own text, not a bar across the window.
+    final toast = tester.getSize(find.ancestor(
+      of: find.textContaining('favourites'),
+      matching: find.byType(Container),
+    ).first);
+    expect(toast.width, lessThan(500));
     expect(find.textContaining('favourites'), findsOneWidget, reason: 'the toast');
     expect(container.read(historyProvider), hasLength(1));
 

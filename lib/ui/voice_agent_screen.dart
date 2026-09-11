@@ -16,6 +16,7 @@ import 'theme.dart';
 import 'widgets/common.dart';
 import 'widgets/mic_button.dart';
 import 'widgets/promo_sheet.dart';
+import 'widgets/toast.dart';
 import 'widgets/transitions.dart';
 
 /// The whole app, on one screen.
@@ -220,21 +221,7 @@ class _FavouriteBanner extends ConsumerWidget {
           );
           if (!context.mounted) return;
 
-          ScaffoldMessenger.of(context)
-            ..clearSnackBars()
-            ..showSnackBar(
-              SnackBar(
-                behavior: SnackBarBehavior.floating,
-                backgroundColor: PlateColors.green,
-                content: Text(
-                  'Saved. That plate is in your favourites.',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: PlateColors.neutral100),
-                ),
-              ),
-            );
+          Toast.show(context, 'Saved. That plate is in your favourites.');
 
           await ref.read(voiceConversationProvider.notifier).stop();
         },
@@ -563,8 +550,10 @@ class _AgentState extends StatelessWidget {
         ('Thinking', PlateColors.warn),
       VoiceConversationState(agent: VoiceAgentState.speaking) =>
         ('Speaking', PlateColors.green),
-      VoiceConversationState(agent: VoiceAgentState.ended) => ('Ended', PlateColors.inkSoft),
-      _ => ('Tap to talk', PlateColors.inkSoft),
+      // Idle and ended look the same and are the same: an empty plate waiting
+      // to be told about. "Ended" describes what just happened rather than
+      // what to do next, and it is the only thing on screen at that moment.
+      _ => ('Describe your meal', PlateColors.inkSoft),
     };
 
     return Padding(

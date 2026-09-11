@@ -7,6 +7,7 @@ import '../../data/api.dart';
 import '../../state/api_providers.dart';
 import '../theme.dart';
 import 'common.dart';
+import 'toast.dart';
 
 /// Redeeming a promo code.
 ///
@@ -57,23 +58,12 @@ class _PromoSheetState extends ConsumerState<PromoSheet> {
       if (!mounted) return;
       Navigator.of(context).pop(true);
 
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: PlateColors.green,
-            content: Text(
-              result.granted == 1
-                  ? 'One more plate. Go ahead.'
-                  : '${result.granted} more plates. Go ahead.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: PlateColors.neutral100),
-            ),
-          ),
-        );
+      Toast.show(
+        context,
+        result.granted == 1
+            ? 'One more plate. Go ahead.'
+            : '${result.granted} more plates. Go ahead.',
+      );
     } on ApiFailure catch (failure) {
       if (!mounted) return;
       setState(() {

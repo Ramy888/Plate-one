@@ -1,11 +1,11 @@
 {
-    "name": "plateone",
-    "short_name": "plateone",
+    "name": "Plate One",
+    "short_name": "Plate One",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F5EAD8",
+    "theme_color": "#56633F",
+    "description": "Say what is on your plate. It names one thing to add.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
