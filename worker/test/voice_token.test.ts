@@ -211,4 +211,47 @@ describe('what it costs', () => {
       });
     }
   });
+})
+
+describe('the free try gates the microphone', () => {
+  it('refuses to mint a token when today\'s plate is used', async () => {
+    // Better said at the microphone than three minutes in, when somebody has
+    // described their dinner to nothing.
+    const token = await register();
+    await runInDurableObject(await quotaForDevice(token), async (q: QuotaCounter) => {
+      const t = Math.floor(Date.now() / 1000);
+      const limit = Number(env.PLATES_PER_DAY);
+      for (let i = 0; i < limit; i++) await q.spend('plate', t);
+    });
+
+    // No interceptor: reaching AssemblyAI here fails against
+    // disableNetConnect rather than passing quietly.
+    const response = await send('/v1/voice/token', { token });
+
+    expect(response.status).toBe(402);
+    const body = (await response.json()) as { error: string; message: string };
+    expect(body.error).toBe('try_used');
+    expect(body.message).toContain('promo code');
+  });
+
+  it('does not spend a conversation on a refusal', async () => {
+    const token = await register();
+    await runInDurableObject(await quotaForDevice(token), async (q: QuotaCounter) => {
+      const t = Math.floor(Date.now() / 1000);
+      const limit = Number(env.PLATES_PER_DAY);
+      for (let i = 0; i < limit; i++) await q.spend('plate', t);
+    });
+
+    const before = await runInDurableObject(
+      await quotaForDevice(token),
+      (q: QuotaCounter) => q.peek(Math.floor(Date.now() / 1000)),
+    );
+    await send('/v1/voice/token', { token });
+    const after = await runInDurableObject(
+      await quotaForDevice(token),
+      (q: QuotaCounter) => q.peek(Math.floor(Date.now() / 1000)),
+    );
+
+    expect(after.voice).toBe(before.voice);
+  });
 });

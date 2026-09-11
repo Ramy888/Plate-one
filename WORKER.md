@@ -29,13 +29,9 @@ on top of it.
 There is no paid tier and nothing to sign into: a judge, or anyone else, opens
 the URL and talks. Two limits stand behind that.
 
-| | Free tries | Pictures | Conversations | Window |
-|---|---|---|---|---|
-| Per device | 1 | 10 | 30 | per day |
-| Whole deployment | `GLOBAL_CALLS_PER_DAY` (2000), across all of it | | | per day |
-
-One try draws the meal a few times over as it is described, and again for each
-suggestion tried, which is why pictures outnumber tries by ten.
+| | Free tries | Window |
+|---|---|---|
+| Whole deployment | `GLOBAL_CALLS_PER_DAY` (2000), across everything | per day |
 
 The per-device allowance stops one phone running up a bill. It does nothing
 about a hundred phones, or one script rotating device ids — which is exactly
@@ -60,13 +56,20 @@ exactly one, for everybody.
 
 A try is the whole journey: talk, be recommended something, watch it drawn.
 Trying all three suggestions costs nothing — it is one try either way — and
-`POST /v1/plate/keep` is the door at the end of the corridor. Drawing is
-refused once the try is over, because there is nothing left to do with the
-picture.
+`POST /v1/plate/keep` is the door at the end of the corridor.
 
-AssemblyAI is free for this event, so talking has no door on it at all. A drawn
-plate is a Gemini call and a Workers AI image, which is real money, and that is
-what the counter is for.
+**The check is at the microphone, not only at the drawing.** `/v1/voice/token`
+refuses a spent try too. Better said before somebody starts than three minutes
+in, when they have described their dinner to nothing.
+
+| | Free tries | Pictures | Conversations | Window |
+|---|---|---|---|---|
+| Per device | 1 | 40 | 30 | per day |
+
+Pictures are never meant to be the thing that stops anyone. One try redraws the
+meal as it is described and again for each suggestion tried — twenty-odd in a
+talkative one — so the ceiling sits well clear of that. The try is the unit a
+person thinks about; this and the global cap are cost guards behind it.
 
 **Promo codes live in a secret, never in this repository.** It is public and
 MIT licensed: a list of codes in the client, a migration or a seed file is a
@@ -168,7 +171,7 @@ npx wrangler r2 bucket create plateone-previews
 cp ../.env.example .dev.vars             # then fill it in
 npm run migrate:local
 npm run dev
-npx vitest run                           # 76 tests
+npx vitest run                           # 78 tests
 ```
 
 The R2 bucket wants a lifecycle rule deleting anything under `p/` after 24

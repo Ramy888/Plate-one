@@ -55,7 +55,7 @@ const DAY = 24 * 60 * 60;
 
 /** Daily caps per device. A spend ceiling, not a monetisation lever. */
 export const PLATES_PER_DAY = 1;
-export const PREVIEWS_PER_DAY = 10;
+export const PREVIEWS_PER_DAY = 40;
 export const VOICE_SESSIONS_PER_DAY = 30;
 
 /** The things that cost money, and the only things counted here. */

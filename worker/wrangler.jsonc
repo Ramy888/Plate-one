@@ -79,7 +79,11 @@
     // One a day; a promo code buys more.
     "PLATES_PER_DAY": "1",
 
-    "PREVIEWS_PER_DAY": "10",
+    // Pictures. Never meant to be the thing that stops anyone: one try redraws
+    // the meal as it is described and again for each suggestion tried, and a
+    // long conversation does that twenty times over. The try is the unit a
+    // person thinks about; this and the global cap are cost guards behind it.
+    "PREVIEWS_PER_DAY": "40",
     "VOICE_SESSIONS_PER_DAY": "30",
 
     // Across every device, per day. The number that actually protects the

@@ -361,10 +361,47 @@ class _Plate extends ConsumerWidget {
                   ClipOval(child: Image.memory(bytes, fit: BoxFit.cover))
                 else if (!visual.loading)
                   Center(
-                    child: Icon(
-                      LucideIcons.utensils,
-                      size: size * 0.17,
-                      color: PlateColors.neutral400,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Padding(
+                        padding: const EdgeInsets.all(Space.lg),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              visual.unavailable
+                                  ? LucideIcons.imageOff
+                                  : LucideIcons.utensils,
+                              size: 30,
+                              color: PlateColors.neutral400,
+                            ),
+                            // A plate that silently stays empty is what "the
+                            // image generation is not working" looks like from
+                            // the outside: no message, and no way to tell
+                            // whether it is still coming.
+                            if (visual.unavailable) ...[
+                              const SizedBox(height: Space.sm),
+                              Text(
+                                'The picture could not\nbe drawn',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: PlateColors.inkSoft),
+                              ),
+                              const SizedBox(height: Space.xs),
+                              Text(
+                                'The suggestion still stands',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(color: PlateColors.inkSoft),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 if (visual.loading) const _PlateSkeleton(),

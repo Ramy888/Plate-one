@@ -116,10 +116,10 @@ export async function postPromo(request: Request, env: Env): Promise<Response> {
     // A code is worth this many more tries.
     plates: offer.grants,
     voice: offer.grants,
-    // Each try draws the meal a few times and then a suggestion or three, so
-    // a code that granted only tries would run out of pictures inside the
-    // first one.
-    previews: offer.grants * 10,
+    // Each try redraws the meal as it is described and again for each
+    // suggestion tried — twenty-odd pictures in a talkative one — so a code
+    // granting only tries would run out of pictures inside the first.
+    previews: offer.grants * 25,
   });
 
   return json({ granted: offer.grants, quota });

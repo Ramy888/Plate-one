@@ -52,11 +52,24 @@ export async function postVoiceToken(request: Request, env: Env): Promise<Respon
     );
   }
 
+  // A try has to be open before anybody starts talking. Speaking is free to
+  // us, but a conversation with no plate at the end of it is a conversation
+  // that cannot finish — better to say so at the microphone than three minutes
+  // in, when somebody has described their dinner to nothing.
+  const stub = quotaForDeviceRow(env, device);
+  const open = await stub.peek(t);
+  if (open.plates <= 0) {
+    throw new ApiError(
+      402,
+      'try_used',
+      'Today’s free plate is used. A promo code opens another, and building a meal by hand is unlimited.',
+    );
+  }
+
   // The deployment's budget first, then this device's own — a device should not
   // be debited by a service that was never going to answer.
   await spendGlobal(env, t);
 
-  const stub = quotaForDeviceRow(env, device);
   const spend = await stub.spend('voice', t);
   if (!spend.ok) {
     throw new ApiError(

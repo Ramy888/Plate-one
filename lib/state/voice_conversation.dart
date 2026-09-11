@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/agent_prompt.dart';
 import '../data/agent_tools.dart';
 import '../data/voice_agent_events.dart';
+import '../data/api.dart';
 import '../data/voice_agent_session.dart';
 import '../domain/food_matcher.dart';
 import '../domain/models.dart';
@@ -243,6 +244,16 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
 
     try {
       await session.start();
+    } on ApiFailure catch (failure) {
+      // A spent try is not a failure to connect. The plate says so, and the
+      // thread stays empty rather than filling with an apology.
+      state = VoiceConversationState(
+        agent: VoiceAgentState.ended,
+        failure: failure.error == ApiError.tryUsed ? null : failure.message,
+      );
+      if (failure.error == ApiError.tryUsed) {
+        ref.read(plateVisualProvider.notifier).showTryUsed();
+      }
     } catch (_) {
       // The session already turned this into something worth reading, and
       // rethrowing here would only reach a tap handler with nowhere to put it.

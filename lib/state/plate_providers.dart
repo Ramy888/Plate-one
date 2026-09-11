@@ -169,6 +169,18 @@ class PlateVisualController extends Notifier<PlateVisual> {
   /// disposed provider throws where nobody is catching.
   bool _stale(String key) => _wanted != key || !ref.mounted;
 
+  /// Says the day's try is used, without asking the server again.
+  ///
+  /// The microphone is refused at the same door the drawing is, so the answer
+  /// is already known by the time somebody taps it.
+  void showTryUsed() {
+    _settle?.cancel();
+    _settle = null;
+    _pending = null;
+    _wanted = '';
+    state = const PlateVisual(blocked: true);
+  }
+
   void clear() {
     _settle?.cancel();
     _settle = null;

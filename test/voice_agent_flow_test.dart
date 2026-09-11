@@ -28,10 +28,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// what makes this possible: no socket, no microphone, no browser, and every
 /// event arrives exactly when the test says so.
 class FakeSession implements VoiceSession {
-  FakeSession({this.failOnStart});
+  FakeSession({this.failOnStart, this.throwOnStart});
 
   /// When set, `start()` throws and reports this.
   final String? failOnStart;
+
+  /// When set, `start()` throws this instead — for the refusals that are not
+  /// a voice failure at all, like a spent try.
+  final Object? throwOnStart;
 
   final _events = StreamController<VoiceEvent>.broadcast();
   final _states = StreamController<VoiceAgentState>.broadcast();
@@ -64,6 +68,7 @@ class FakeSession implements VoiceSession {
   @override
   Future<void> start() async {
     started = true;
+    if (throwOnStart case final error?) throw error;
     if (failOnStart case final message?) {
       failure = message;
       throw VoiceFailure(message);
@@ -103,8 +108,9 @@ void main() {
   Future<ProviderContainer> openHome(
     WidgetTester tester, {
     String? failOnStart,
+    Object? throwOnStart,
   }) async {
-    session = FakeSession(failOnStart: failOnStart);
+    session = FakeSession(failOnStart: failOnStart, throwOnStart: throwOnStart);
     savedImages = MemoryPatchImages();
     keepApi = _KeepApi();
     await tester.pumpWidget(
@@ -557,6 +563,40 @@ void main() {
 
     expect(find.textContaining('free plate'), findsOneWidget);
     expect(find.text('Tap to enter a code'), findsOneWidget);
+  });
+
+  testWidgets('a plate that could not be drawn says so', (tester) async {
+    // Silence here is what "the image generation is not working" looks like
+    // from the outside: an empty dish, no message, no way to tell whether it
+    // is still coming.
+    final container = await openHome(tester);
+    container.read(plateVisualProvider.notifier).state =
+        const PlateVisual(unavailable: true);
+    await tester.pump();
+
+    expect(find.textContaining('could not'), findsOneWidget);
+    // And it has to say what still works, or it reads as a dead end.
+    expect(find.textContaining('suggestion still stands'), findsOneWidget);
+  });
+
+  testWidgets('the microphone is refused when the try is used, and says where',
+      (tester) async {
+    // Said at the microphone rather than three minutes in, when somebody has
+    // described their dinner to nothing.
+    final container = await openHome(
+      tester,
+      throwOnStart: const ApiFailure(
+        ApiError.tryUsed,
+        'Today\u2019s free plate is used.',
+      ),
+    );
+    await tapMic(tester);
+
+    expect(container.read(plateVisualProvider).blocked, isTrue);
+    expect(find.text('Tap to enter a code'), findsOneWidget);
+    // Not an apology in the thread: the plate already said it.
+    expect(container.read(voiceConversationProvider).failure, isNull);
+    expect(container.read(voiceConversationProvider).turns, isEmpty);
   });
 
   testWidgets('the answer time is put in front of whoever is watching',
