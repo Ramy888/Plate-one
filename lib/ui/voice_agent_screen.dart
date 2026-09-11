@@ -396,6 +396,10 @@ class _Plate extends ConsumerWidget {
                 // happening. A message somewhere else leaves someone looking at
                 // an empty dish wondering what they did wrong.
                 if (visual.blocked) const _PlateBlocked(),
+                // What a code just opened, until the next conversation starts.
+                // A toast is gone in three seconds and the number is the thing
+                // somebody wants to check.
+                if (visual.granted case final plates?) _PlateGranted(plates: plates),
                 // The shadow the rim casts down into the well. Always last, so
                 // it falls across the food as well as the porcelain.
                 IgnorePointer(
@@ -471,6 +475,54 @@ class _PlateBlocked extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// What a redeemed code opened.
+class _PlateGranted extends StatelessWidget {
+  const _PlateGranted({required this.plates});
+
+  final int plates;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipOval(
+      child: ColoredBox(
+        color: PlateColors.greenSoft.withValues(alpha: 0.95),
+        child: Padding(
+          padding: const EdgeInsets.all(Space.lg),
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(LucideIcons.check, size: 28, color: PlateColors.green),
+                  const SizedBox(height: Space.sm),
+                  Text(
+                    plates == 1 ? '1 plate available' : '$plates plates available',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(color: PlateColors.greenPress),
+                  ),
+                  const SizedBox(height: Space.xs),
+                  Text(
+                    'Tap the microphone',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: PlateColors.green),
+                  ),
+                ],
               ),
             ),
           ),

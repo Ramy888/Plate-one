@@ -235,6 +235,9 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
   Future<void> start() async {
     if (state.isLive) return;
     state = const VoiceConversationState(starting: true);
+    // Whatever the plate was saying — a spent try, a code just redeemed — is
+    // about the last conversation, not this one.
+    ref.read(plateVisualProvider.notifier).clear();
 
     final session = _session = ref.read(voiceSessionFactoryProvider)();
     _events = session.events.listen(_onEvent);

@@ -21,6 +21,7 @@ class PlateVisual {
     this.loading = false,
     this.unavailable = false,
     this.blocked = false,
+    this.granted,
   });
 
   /// What a rating or a report is filed against. Empty until one arrives.
@@ -39,6 +40,11 @@ class PlateVisual {
   /// from [unavailable] because it is not a failure: it has a way out, and the
   /// plate says what it is.
   final bool blocked;
+
+  /// How many plates a redeemed code just opened. The plate says so until the
+  /// next conversation starts — a toast is gone in three seconds, and the
+  /// number is the thing somebody wants to check.
+  final int? granted;
 
   /// The allowance is spent, which is a reason to sell rather than apologise.
 }
@@ -168,6 +174,15 @@ class PlateVisualController extends Notifier<PlateVisual> {
   /// meal back on a plate somebody has already cleared, and writing to a
   /// disposed provider throws where nobody is catching.
   bool _stale(String key) => _wanted != key || !ref.mounted;
+
+  /// Says how many plates a code just opened.
+  void showGranted(int plates) {
+    _settle?.cancel();
+    _settle = null;
+    _pending = null;
+    _wanted = '';
+    state = PlateVisual(granted: plates);
+  }
 
   /// Says the day's try is used, without asking the server again.
   ///

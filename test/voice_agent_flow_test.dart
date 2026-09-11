@@ -607,6 +607,29 @@ void main() {
     expect(container.read(voiceConversationProvider).turns, isEmpty);
   });
 
+  testWidgets('a redeemed code leaves the count on the plate', (tester) async {
+    // A toast is gone in three seconds. The number is the thing somebody wants
+    // to check, so the plate holds it until the next conversation starts.
+    final container = await openHome(tester);
+    container.read(plateVisualProvider.notifier).showGranted(10);
+    await tester.pump();
+
+    expect(find.text('10 plates available'), findsOneWidget);
+    expect(find.text('Tap the microphone'), findsOneWidget);
+  });
+
+  testWidgets('starting a conversation clears what the plate was saying',
+      (tester) async {
+    final container = await openHome(tester);
+    container.read(plateVisualProvider.notifier).showGranted(10);
+    await tester.pump();
+    expect(find.text('10 plates available'), findsOneWidget);
+
+    await tapMic(tester);
+
+    expect(find.text('10 plates available'), findsNothing);
+  });
+
   testWidgets('the answer time is put in front of whoever is watching',
       (tester) async {
     // The demo's headline number, measured from the first turn rather than

@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../data/api.dart';
 import '../../state/api_providers.dart';
+import '../../state/plate_providers.dart';
 import '../theme.dart';
 import 'toast.dart';
 
@@ -37,6 +38,20 @@ class _PromoDialogState extends ConsumerState<PromoDialog> {
   bool _sending = false;
   String? _refusal;
 
+  /// Whether there is anything to submit. A Redeem button sitting there before
+  /// a code has been typed is a button that does nothing, and it is the one
+  /// thing on the dialog that looks like the next step.
+  bool _typed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _code.addListener(() {
+      final typed = _code.text.trim().isNotEmpty;
+      if (typed != _typed) setState(() => _typed = typed);
+    });
+  }
+
   @override
   void dispose() {
     _code.dispose();
@@ -57,6 +72,9 @@ class _PromoDialogState extends ConsumerState<PromoDialog> {
       if (!mounted) return;
       Navigator.of(context).pop(true);
 
+      // The plate holds the number until the next conversation starts; the
+      // toast is the moment it happened.
+      ref.read(plateVisualProvider.notifier).showGranted(result.quota.plates);
       Toast.show(
         context,
         result.granted == 1
@@ -164,20 +182,22 @@ class _PromoDialogState extends ConsumerState<PromoDialog> {
                     onPressed: _sending ? null : () => Navigator.of(context).pop(false),
                     child: const Text('Not now'),
                   ),
-                  const SizedBox(width: Space.sm),
-                  FilledButton(
-                    onPressed: _sending ? null : _redeem,
-                    child: _sending
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.2,
-                              color: PlateColors.neutral100,
-                            ),
-                          )
-                        : const Text('Redeem'),
-                  ),
+                  if (_typed) ...[
+                    const SizedBox(width: Space.sm),
+                    FilledButton(
+                      onPressed: _sending ? null : _redeem,
+                      child: _sending
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: PlateColors.neutral100,
+                              ),
+                            )
+                          : const Text('Redeem'),
+                    ),
+                  ],
                 ],
               ),
             ],
