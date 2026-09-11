@@ -194,4 +194,4 @@ final patchResultProvider = Provider<PatchResult>((ref) {
 });
 
 /// Pictures of saved patches, on this device only.
-final patchImagesProvider = Provider<PatchImages>((ref) => const DevicePatchImages());
+final patchImagesProvider = Provider<PatchImages>((ref) => PatchImages());

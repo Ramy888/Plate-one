@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:plateone/data/patch_images.dart';
@@ -84,6 +85,7 @@ class FakeSession implements VoiceSession {
 
 void main() {
   late FakeSession session;
+  late MemoryPatchImages savedImages;
 
   // Loaded once. Reading the bundled catalogue on every test is slow and, more
   // to the point, the asset bundle does not enjoy being asked repeatedly.
@@ -100,6 +102,7 @@ void main() {
     String? failOnStart,
   }) async {
     session = FakeSession(failOnStart: failOnStart);
+    savedImages = MemoryPatchImages();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -111,7 +114,7 @@ void main() {
           // with the answer, not the asking.
           plateVisualProvider.overrideWith(_NoDrawing.new),
           // Saving writes the picture to disk. There is no disk here.
-          patchImagesProvider.overrideWithValue(MemoryPatchImages()),
+          patchImagesProvider.overrideWithValue(savedImages),
         ],
         child: MediaQuery(
           // The skeleton sweep is deliberately endless; a test that settles on
@@ -488,6 +491,34 @@ void main() {
         reason: 'the screen goes back to idle once the plate is kept');
   });
 
+  testWidgets('the picture is kept with the plate, not just shown once',
+      (tester) async {
+    // The server deletes its copy within a day, so a saved plate keeps its own.
+    // A history of grey placeholders is not worth keeping.
+    final container = await openHome(tester);
+    await tapMic(tester);
+    container.read(mealDraftProvider.notifier).toggleFood('white_rice');
+    final offered = container.read(agentToolsProvider).recommendNow();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // A plate that has been drawn. A real one-pixel PNG, because the screen
+    // decodes whatever it is given.
+    container.read(plateVisualProvider.notifier).state =
+        PlateVisual(image: _onePixelPng);
+
+    await tester.ensureVisible(find.text(offered.first.addition.name));
+    await tester.pump();
+    await tester.tap(find.text(offered.first.addition.name));
+    await tester.pump();
+    await tester.tap(find.text('Add this plate to favourite plates'));
+    await tester.pump();
+    await tester.pump();
+
+    final saved = container.read(historyProvider).single;
+    expect(saved.imagePath, isNotNull, reason: 'the picture was filed with it');
+    expect(await savedImages.get(saved.imagePath), isNotEmpty);
+  });
+
   testWidgets('the answer time is put in front of whoever is watching',
       (tester) async {
     // The demo's headline number, measured from the first turn rather than
@@ -516,3 +547,10 @@ class _NoDrawing extends PlateVisualController {
   @override
   Future<void> load({required List<String> foodIds, String additionId = ''}) async {}
 }
+
+/// The smallest valid PNG. Stands in for a drawn plate wherever the widget
+/// under test actually decodes the bytes.
+final _onePixelPng = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAE'
+  'hQGAhKmMIQAAAABJRU5ErkJggg==',
+);
