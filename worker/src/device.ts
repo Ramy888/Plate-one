@@ -14,9 +14,6 @@ import type { QuotaCounter, QuotaView } from './quota';
 export interface DeviceRow {
   id: string;
   platform: string;
-
-  /// SHA-256 of the Google subject, when somebody signed in. Null otherwise.
-  accountHash?: string | null;
 }
 
 const PLATFORMS = new Set(['android', 'ios', 'web']);
@@ -33,15 +30,14 @@ export async function registerDevice(
   env: Env,
   platform: string,
   now: number,
-  accountHash: string | null = null,
 ): Promise<{ token: string; device: DeviceRow }> {
   const token = randomToken();
-  const device: DeviceRow = { id: crypto.randomUUID(), platform, accountHash };
+  const device: DeviceRow = { id: crypto.randomUUID(), platform };
   await env.DB.prepare(
-    `INSERT INTO devices (id, token_hash, platform, created_at, last_seen_at, account_hash)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO devices (id, token_hash, platform, created_at, last_seen_at)
+     VALUES (?, ?, ?, ?, ?)`,
   )
-    .bind(device.id, await sha256Hex(token), platform, now, now, accountHash)
+    .bind(device.id, await sha256Hex(token), platform, now, now)
     .run();
   return { token, device };
 }
@@ -57,7 +53,7 @@ export async function authenticateDevice(
 ): Promise<DeviceRow> {
   const token = bearerToken(request);
   const row = await env.DB.prepare(
-    'SELECT id, platform, account_hash AS accountHash FROM devices WHERE token_hash = ?',
+    'SELECT id, platform FROM devices WHERE token_hash = ?',
   )
     .bind(await sha256Hex(token))
     .first<DeviceRow>();
@@ -76,16 +72,9 @@ export function quotaFor(env: Env, deviceId: string): DurableObjectStub<QuotaCou
   return env.QUOTA.get(env.QUOTA.idFromName(deviceId));
 }
 
-/**
- * The allowance for whoever is making this call.
- *
- * Keyed on the account when there is one, so signing in on a second device
- * does not hand out a second allowance — and signing out and back in does not
- * either. Without an account it falls back to the device, which is what a
- * deployment with sign-in switched off gets.
- */
+/** The allowance for whoever is making this call. */
 export function quotaForDeviceRow(env: Env, device: DeviceRow): DurableObjectStub<QuotaCounter> {
-  return quotaFor(env, device.accountHash ?? device.id);
+  return quotaFor(env, device.id);
 }
 
 export async function forgetDevice(env: Env, device: DeviceRow): Promise<void> {

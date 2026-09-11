@@ -75,9 +75,7 @@ export async function postPromo(request: Request, env: Env): Promise<Response> {
     throw new ApiError(404, 'promo_unknown', 'That code is not one we know.');
   }
 
-  // Keyed on the account when signed in, so redeeming on a phone and again on
-  // a laptop is one redemption, the same way the allowance is one allowance.
-  const redeemer = device.accountHash ?? device.id;
+  const redeemer = device.id;
   const codeHash = await sha256Hex(offer.code);
 
   // The primary key on (code_hash, redeemer) is what actually enforces this;
@@ -115,10 +113,13 @@ export async function postPromo(request: Request, env: Env): Promise<Response> {
   }
 
   const quota = await quotaForDeviceRow(env, device).grant(t, {
+    // A code is worth this many more tries.
+    plates: offer.grants,
     voice: offer.grants,
-    // Conversations draw plates, so a code that gave only conversations would
-    // run out of pictures halfway through the first one.
-    previews: offer.grants * 3,
+    // Each try draws the meal a few times and then a suggestion or three, so
+    // a code that granted only tries would run out of pictures inside the
+    // first one.
+    previews: offer.grants * 10,
   });
 
   return json({ granted: offer.grants, quota });

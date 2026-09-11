@@ -74,8 +74,13 @@
     // again for each suggestion tried, so one conversation is several — far
     // more than the photo-editing preview ever needed. Repeats are free: the
     // same plate is cached under a key derived from its contents.
-    "PREVIEWS_PER_DAY": "30",
-    "VOICE_SESSIONS_PER_DAY": "12",
+    // Free tries. A try is the whole journey — talk, be recommended
+    // something, see it drawn — and keeping the plate is what spends it.
+    // One a day; a promo code buys more.
+    "PLATES_PER_DAY": "1",
+
+    "PREVIEWS_PER_DAY": "10",
+    "VOICE_SESSIONS_PER_DAY": "30",
 
     // Across every device, per day. The number that actually protects the
     // budget. Lower it before sharing the URL widely; raise it for a demo.
@@ -84,11 +89,6 @@
     // Browser origins allowed to call this API. The app's own page must be
     // here or every call fails before it is sent. Comma-separated; the
     // localhost entries are for `flutter run -d chrome` and a local build.
-    // Google sign-in. The *web* OAuth client id, which is public by design —
-    // it identifies the app, it does not authorise anything. Empty turns
-    // sign-in off and /v1/device goes back to anonymous devices.
-    "GOOGLE_CLIENT_ID": "",
-
     // How many people may redeem each promo code. The codes themselves are a
     // secret — see src/promo.ts — because this repository is public.
     "PROMO_USES_PER_CODE": "1",

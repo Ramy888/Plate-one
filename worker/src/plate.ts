@@ -38,18 +38,6 @@ export async function postPlate(request: Request, env: Env): Promise<Response> {
   const t = now();
   const device = await authenticateDevice(request, env, t);
 
-  // Drawing a plate is the only thing here that spends somebody else's money:
-  // a Gemini call and a Workers AI image. Talking is free to us, so it stays
-  // open — this is the one door with a lock on it, and it only has one when
-  // the deployment is configured for sign-in at all.
-  if (env.GOOGLE_CLIENT_ID && !device.accountHash) {
-    throw new ApiError(
-      401,
-      'sign_in_required',
-      'Sign in to have your plate drawn. Everything else works without it.',
-    );
-  }
-
   const body = await readJson(request);
   const rawFoods = Array.isArray(body.foodIds) ? body.foodIds : [];
   const foodIds = rawFoods.filter((id): id is string => typeof id === 'string').slice(0, 12);
@@ -88,16 +76,27 @@ export async function postPlate(request: Request, env: Env): Promise<Response> {
     });
   }
 
+  // A try has to still be open. Drawing does not spend it — keeping the plate
+  // does — but there is no point drawing plates for a try that is over.
+  const stub = quotaForDeviceRow(env, device);
+  const open = await stub.peek(t);
+  if (open.plates <= 0) {
+    throw new ApiError(
+      402,
+      'try_used',
+      'Today’s free plate is used. A promo code opens another, and building a meal by hand is unlimited.',
+    );
+  }
+
   // The deployment's budget first, then this device's own.
   await spendGlobal(env, t);
 
-  const stub = quotaForDeviceRow(env, device);
   const spend = await stub.spend('preview', t);
   if (!spend.ok) {
     throw new ApiError(
       402,
       'quota_exhausted',
-      'You have used today’s pictures. The suggestion itself is unlimited.',
+      'That is as many pictures as one plate gets. The suggestion itself is unlimited.',
     );
   }
 
@@ -220,4 +219,31 @@ async function plateCacheKey(foodIds: string[], additionId: string): Promise<str
 
 function previewUrlFor(request: Request, key: string): string {
   return `${new URL(request.url).origin}/v1/preview/${encodeURIComponent(key.slice(2))}`;
+}
+
+/**
+ * Ends the try.
+ *
+ * Keeping a plate is the last thing somebody does with one, so it is what
+ * spends the day's free try. Drawing is free within an open try — trying all
+ * three suggestions should not cost anything — and this is the door at the end
+ * of that corridor.
+ *
+ * The plate itself is kept on the device. Nothing about the meal is sent here
+ * and nothing about it is stored; this counts, and only counts.
+ */
+export async function postPlateKeep(request: Request, env: Env): Promise<Response> {
+  const t = now();
+  const device = await authenticateDevice(request, env, t);
+
+  const spend = await quotaForDeviceRow(env, device).spend('plate', t);
+  if (!spend.ok) {
+    throw new ApiError(
+      402,
+      'try_used',
+      'Today’s free plate is used. A promo code opens another.',
+    );
+  }
+
+  return json({ quota: spend.quota });
 }

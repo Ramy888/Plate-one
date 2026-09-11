@@ -15,6 +15,8 @@ import { DurableObject } from 'cloudflare:workers';
  */
 
 export interface QuotaState {
+  /** Plates kept. One a day, and keeping one is what ends the try. */
+  platesUsed: number;
   previewsUsed: number;
   voiceUsed: number;
   /** Unix seconds at which the current counting window opened. */
@@ -26,12 +28,19 @@ export interface QuotaState {
    * Survives the daily reset rather than being wiped by it: someone handed a
    * code at nine in the evening should still have it in the morning.
    */
+  bonusPlates?: number;
   bonusPreviews?: number;
   bonusVoice?: number;
 }
 
 /** What the app is told. Enough to render the right screen without guessing. */
 export interface QuotaView {
+  /**
+   * Free tries left. A try is the whole journey — talk, be recommended
+   * something, see it drawn — and keeping the plate is what spends it.
+   */
+  plates: number;
+
   /** What is left today, not what has been spent. */
   previews: number;
   /** Voice sessions. The main feature, so the most generous of the three. */
@@ -45,21 +54,28 @@ export interface QuotaView {
 const DAY = 24 * 60 * 60;
 
 /** Daily caps per device. A spend ceiling, not a monetisation lever. */
-export const PREVIEWS_PER_DAY = 4;
-export const VOICE_SESSIONS_PER_DAY = 12;
+export const PLATES_PER_DAY = 1;
+export const PREVIEWS_PER_DAY = 10;
+export const VOICE_SESSIONS_PER_DAY = 30;
 
-/** The three things that cost money, and the only things counted here. */
-export type Spend = 'preview' | 'voice';
+/** The things that cost money, and the only things counted here. */
+export type Spend = 'plate' | 'preview' | 'voice';
 
 const EMPTY: QuotaState = {
+  platesUsed: 0,
   previewsUsed: 0,
   voiceUsed: 0,
   windowStart: 0,
+  bonusPlates: 0,
   bonusPreviews: 0,
   bonusVoice: 0,
 };
 
 export class QuotaCounter extends DurableObject<Env> {
+  private get platesPerDay(): number {
+    return Number(this.env.PLATES_PER_DAY ?? PLATES_PER_DAY);
+  }
+
   private get previewsPerDay(): number {
     return Number(this.env.PREVIEWS_PER_DAY ?? PREVIEWS_PER_DAY);
   }
@@ -77,6 +93,7 @@ export class QuotaCounter extends DurableObject<Env> {
         windowStart: now,
         // The day resets; what somebody was given does not. Wiping a code at
         // midnight would make handing one out in the evening close to useless.
+        bonusPlates: stored.bonusPlates ?? 0,
         bonusPreviews: stored.bonusPreviews ?? 0,
         bonusVoice: stored.bonusVoice ?? 0,
       };
@@ -90,19 +107,22 @@ export class QuotaCounter extends DurableObject<Env> {
   }
 
   private view(state: QuotaState): QuotaView {
+    const bonusPlates = state.bonusPlates ?? 0;
     const bonusPreviews = state.bonusPreviews ?? 0;
     const bonusVoice = state.bonusVoice ?? 0;
     return {
+      plates: Math.max(0, this.platesPerDay + bonusPlates - state.platesUsed),
       previews: Math.max(0, this.previewsPerDay + bonusPreviews - state.previewsUsed),
       voice: Math.max(0, this.voicePerDay + bonusVoice - state.voiceUsed),
       resetsAt: state.windowStart + DAY,
-      bonus: bonusVoice > 0 || bonusPreviews > 0,
+      bonus: bonusPlates > 0 || bonusVoice > 0 || bonusPreviews > 0,
     };
   }
 
   private static spent(state: QuotaState, kind: Spend, by: number): QuotaState {
     return {
       ...state,
+      platesUsed: state.platesUsed + (kind === 'plate' ? by : 0),
       previewsUsed: state.previewsUsed + (kind === 'preview' ? by : 0),
       voiceUsed: state.voiceUsed + (kind === 'voice' ? by : 0),
     };
@@ -120,7 +140,7 @@ export class QuotaCounter extends DurableObject<Env> {
   async spend(kind: Spend, now: number): Promise<{ ok: boolean; quota: QuotaView }> {
     const state = await this.load(now);
     const before = this.view(state);
-    if (before[kind === 'preview' ? 'previews' : 'voice'] <= 0) {
+    if (before[kind === 'plate' ? 'plates' : kind === 'preview' ? 'previews' : 'voice'] <= 0) {
       return { ok: false, quota: before };
     }
 
@@ -139,6 +159,7 @@ export class QuotaCounter extends DurableObject<Env> {
     await this.ctx.storage.put('state', {
       ...given,
       // A refund must never mint allowance out of nothing.
+      platesUsed: Math.max(0, given.platesUsed),
       previewsUsed: Math.max(0, given.previewsUsed),
       voiceUsed: Math.max(0, given.voiceUsed),
     });
@@ -152,11 +173,12 @@ export class QuotaCounter extends DurableObject<Env> {
    */
   async grant(
     now: number,
-    { voice = 0, previews = 0 }: { voice?: number; previews?: number },
+    { plates = 0, voice = 0, previews = 0 }: { plates?: number; voice?: number; previews?: number },
   ): Promise<QuotaView> {
     const state = await this.load(now);
     const next: QuotaState = {
       ...state,
+      bonusPlates: (state.bonusPlates ?? 0) + plates,
       bonusVoice: (state.bonusVoice ?? 0) + voice,
       bonusPreviews: (state.bonusPreviews ?? 0) + previews,
     };

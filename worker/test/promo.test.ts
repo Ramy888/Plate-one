@@ -84,9 +84,10 @@ describe('redeeming a code', () => {
 
     const body = (await response.json()) as {
       granted: number;
-      quota: { voice: number; bonus: boolean };
+      quota: { plates: number; voice: number; bonus: boolean };
     };
     expect(body.granted).toBe(5);
+    expect(body.quota.plates).toBe(Number(env.PLATES_PER_DAY) + 5);
     expect(body.quota.voice).toBe(5);
     expect(body.quota.bonus).toBe(true);
   });
@@ -124,6 +125,8 @@ describe('redeeming a code', () => {
     const tomorrow = Math.floor(Date.now() / 1000) + 25 * 60 * 60;
     const view = await runInDurableObject(stub, (q: QuotaCounter) => q.peek(tomorrow));
 
+    // The tries are the part that matters — they are what the code is for.
+    expect(view.plates).toBe(Number(env.PLATES_PER_DAY) + 5);
     expect(view.voice).toBe(Number(env.VOICE_SESSIONS_PER_DAY) + 5);
     expect(view.bonus).toBe(true);
   });

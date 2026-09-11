@@ -91,7 +91,7 @@ describe('minting a voice token', () => {
     expect(body.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
     // Three hours is AssemblyAI's default; a tab left open must not bill for it.
     expect(body.maxSessionSeconds).toBeLessThanOrEqual(600);
-    expect(body.quota.voice).toBe(11);
+    expect(body.quota.voice).toBe(Number(env.VOICE_SESSIONS_PER_DAY) - 1);
   });
 
   it('never puts the API key in the response', async () => {
@@ -143,7 +143,7 @@ describe('what it costs', () => {
     const stub = await quotaForDevice(deviceToken);
     await runInDurableObject(stub, async (instance: QuotaCounter) => {
       const quota = await instance.peek(Math.floor(Date.now() / 1000));
-      expect(quota.voice).toBe(11);
+      expect(quota.voice).toBe(Number(env.VOICE_SESSIONS_PER_DAY) - 1);
       // A conversation is not a meal scan and not a picture.
       expect(quota.previews).toBe(Number(env.PREVIEWS_PER_DAY));
       expect(quota.previews).toBe(Number(env.PREVIEWS_PER_DAY));
@@ -156,7 +156,8 @@ describe('what it costs', () => {
     const stub = await quotaForDevice(deviceToken);
     await runInDurableObject(stub, async (instance: QuotaCounter) => {
       const t = Math.floor(Date.now() / 1000);
-      for (let i = 0; i < 12; i++) await instance.spend('voice', t);
+      const limit = Number(env.VOICE_SESSIONS_PER_DAY);
+      for (let i = 0; i < limit; i++) await instance.spend('voice', t);
     });
 
     const response = await send('/v1/voice/token', { token: deviceToken });
@@ -174,7 +175,9 @@ describe('what it costs', () => {
     const stub = await quotaForDevice(deviceToken);
     await runInDurableObject(stub, async (instance: QuotaCounter) => {
       // The user should not pay for our failure.
-      expect((await instance.peek(Math.floor(Date.now() / 1000))).voice).toBe(12);
+      expect((await instance.peek(Math.floor(Date.now() / 1000))).voice).toBe(
+        Number(env.VOICE_SESSIONS_PER_DAY),
+      );
     });
   });
 

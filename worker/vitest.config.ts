@@ -28,7 +28,6 @@ export default defineWorkersConfig({
             // real client id: the check that matters is that a token for some
             // *other* audience is refused, and that is only meaningful against
             // a value the test controls.
-            GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
             // Test codes, not the real ones. The real ones live in a secret
             // and never reach this repository — see src/promo.ts.
             PROMO_CODES: 'PLATE-TEST1:5,PLATE-TEST2:3',

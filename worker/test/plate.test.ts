@@ -8,7 +8,7 @@ import {
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import worker from '../src/index';
-import { globalCap, googleIdToken, interceptGoogleCerts, quotaForDevice } from './helpers';
+import { globalCap, quotaForDevice } from './helpers';
 import type { QuotaCounter } from '../src/quota';
 
 const BASE = 'https://api.plateone.app';
@@ -23,15 +23,7 @@ async function send(request: Request): Promise<Response> {
   return response;
 }
 
-/**
- * A signed-in device.
- *
- * Drawing a plate is the one route that requires an account, because it is the
- * one that spends somebody else's money. Every test here needs one, and each
- * unique subject gets its own allowance.
- */
-async function register(subject = `plate-${++ipCounter}`): Promise<string> {
-  await interceptGoogleCerts();
+async function register(): Promise<string> {
   const response = await send(
     new Request(`${BASE}/v1/device`, {
       method: 'POST',
@@ -39,10 +31,7 @@ async function register(subject = `plate-${++ipCounter}`): Promise<string> {
         'content-type': 'application/json',
         'cf-connecting-ip': `10.30.${Math.floor(++ipCounter / 250)}.${ipCounter % 250}`,
       },
-      body: JSON.stringify({
-        platform: 'web',
-        idToken: await googleIdToken({ sub: subject }),
-      }),
+      body: JSON.stringify({ platform: 'web' }),
     }),
   );
   return ((await response.json()) as { deviceToken: string }).deviceToken;
@@ -332,39 +321,78 @@ describe('what a picture costs', () => {
   });
 });
 
-describe('who may have a plate drawn', () => {
-  it('refuses somebody who has not signed in', async () => {
-    // Talking is free to us and stays open. Drawing is a Gemini call and a
-    // Workers AI image, and that is the one door with a lock on it.
-    const anonymous = await send(
-      new Request(`${BASE}/v1/device`, {
+describe('the free try', () => {
+  it('is spent by keeping the plate, not by drawing one', async () => {
+    // Trying all three suggestions should not cost anything. Keeping one is
+    // the act that ends the day's try.
+    const images = stubImages();
+    const token = await register();
+
+    await send(plateRequest(token, { foodIds: ['white_rice'] }));
+    await send(plateRequest(token, { foodIds: ['white_rice', 'chicken'] }));
+
+    const mid = await runInDurableObject(
+      await quotaForDevice(token),
+      (q: QuotaCounter) => q.peek(Math.floor(Date.now() / 1000)),
+    );
+    expect(mid.plates).toBe(Number(env.PLATES_PER_DAY));
+
+    const kept = await send(
+      new Request(`${BASE}/v1/plate/keep`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'cf-connecting-ip': '10.35.0.1' },
-        body: JSON.stringify({ platform: 'web' }),
+        headers: { authorization: `Bearer ${token}`, 'cf-connecting-ip': '10.36.0.1' },
       }),
     );
-    const token = ((await anonymous.json()) as { deviceToken: string }).deviceToken;
-
-    // No image stub and no caption interceptor: if this reaches a model at
-    // all, it fails against disableNetConnect rather than passing quietly.
-    const response = await send(plateRequest(token, { foodIds: ['white_rice'] }));
-
-    expect(response.status).toBe(401);
-    const body = (await response.json()) as { error: string; message: string };
-    expect(body.error).toBe('sign_in_required');
-    // It has to say what still works, or it reads as the app being broken.
-    expect(body.message).toContain('without it');
+    expect(kept.status).toBe(200);
+    expect(((await kept.json()) as { quota: { plates: number } }).quota.plates).toBe(0);
+    images.restore();
   });
 
-  it('does not spend an allowance on a call it refuses', async () => {
-    const anonymous = await send(
-      new Request(`${BASE}/v1/device`, {
+  it('cannot be kept twice', async () => {
+    const token = await register();
+    const keep = () =>
+      send(
+        new Request(`${BASE}/v1/plate/keep`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}`, 'cf-connecting-ip': '10.36.0.2' },
+        }),
+      );
+
+    expect((await keep()).status).toBe(200);
+    const again = await keep();
+    expect(again.status).toBe(402);
+    expect(((await again.json()) as { error: string }).error).toBe('try_used');
+  });
+
+  it('closes the door on drawing once it is over', async () => {
+    const token = await register();
+    await send(
+      new Request(`${BASE}/v1/plate/keep`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'cf-connecting-ip': '10.35.0.2' },
-        body: JSON.stringify({ platform: 'web' }),
+        headers: { authorization: `Bearer ${token}`, 'cf-connecting-ip': '10.36.0.3' },
       }),
     );
-    const token = ((await anonymous.json()) as { deviceToken: string }).deviceToken;
+
+    // No image stub and no caption interceptor: reaching a model here fails
+    // against disableNetConnect rather than passing quietly.
+    const response = await send(plateRequest(token, { foodIds: ['white_rice'] }));
+
+    expect(response.status).toBe(402);
+    const body = (await response.json()) as { error: string; message: string };
+    expect(body.error).toBe('try_used');
+    // It has to say what still works, or it reads as the app being broken.
+    expect(body.message).toContain('by hand');
+    expect(body.message).toContain('promo code');
+  });
+
+  it('does not spend a picture on a draw it refuses', async () => {
+    const token = await register();
+    await send(
+      new Request(`${BASE}/v1/plate/keep`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'cf-connecting-ip': '10.36.0.4' },
+      }),
+    );
 
     const before = await runInDurableObject(
       await quotaForDevice(token),
@@ -377,5 +405,29 @@ describe('who may have a plate drawn', () => {
     );
 
     expect(after.previews).toBe(before.previews);
+  });
+
+  it('a code opens another one', async () => {
+    const token = await register();
+    await send(
+      new Request(`${BASE}/v1/plate/keep`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'cf-connecting-ip': '10.36.0.5' },
+      }),
+    );
+
+    const redeemed = await send(
+      new Request(`${BASE}/v1/promo`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+          'cf-connecting-ip': '10.36.0.6',
+        },
+        body: JSON.stringify({ code: 'PLATE-TEST1' }),
+      }),
+    );
+    expect(redeemed.status).toBe(200);
+    expect(((await redeemed.json()) as { quota: { plates: number } }).quota.plates).toBe(5);
   });
 });
