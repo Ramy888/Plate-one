@@ -22,8 +22,7 @@ import {
   requireString,
 } from './http';
 import { postPlate } from './plate';
-import { getPreview, postPreview } from './preview';
-import { postScan } from './scan';
+import { getPreview } from './preview';
 import { postVoiceToken } from './voice_token';
 
 export { GlobalCap, QuotaCounter } from './quota';
@@ -110,7 +109,7 @@ async function postReport(request: Request, env: Env): Promise<Response> {
       .bind(
         crypto.randomUUID(),
         device.id,
-        targetType === 'preview' ? 'preview' : 'scan',
+        targetType === 'preview' ? 'preview' : 'plate',
         targetId,
         REPORT_REASONS.has(reason) ? reason : 'other',
         note,
@@ -128,19 +127,9 @@ async function postReport(request: Request, env: Env): Promise<Response> {
 
 type Handler = (request: Request, env: Env) => Promise<Response>;
 
-/** A per-IP ceiling on paid calls, on top of each device's own quota. */
-async function scanRoute(request: Request, env: Env): Promise<Response> {
-  await enforceLimit(env, `scan:${clientIp(request)}`, 20, 3600);
-  return postScan(request, env);
-}
-
-async function previewRoute(request: Request, env: Env): Promise<Response> {
-  await enforceLimit(env, `preview:${clientIp(request)}`, 12, 3600);
-  return postPreview(request, env);
-}
-
-// Writing up and drawing a plate the engine has already decided on. Same cost
-// as the others: one model call and one image.
+/// Writing up and drawing a plate the engine has already decided on: one model
+/// call and one image. A per-IP ceiling on top of each device's own allowance,
+/// because a device id is free to mint and an IP is not.
 async function plateRoute(request: Request, env: Env): Promise<Response> {
   await enforceLimit(env, `plate:${clientIp(request)}`, 40, 3600);
   return postPlate(request, env);
@@ -156,8 +145,6 @@ async function voiceTokenRoute(request: Request, env: Env): Promise<Response> {
 
 const ROUTES: Record<string, Partial<Record<string, Handler>>> = {
   '/v1/device': { POST: postDevice, DELETE: deleteDevice },
-  '/v1/scan': { POST: scanRoute },
-  '/v1/preview': { POST: previewRoute },
   '/v1/quota': { GET: getQuota },
   '/v1/report': { POST: postReport },
   '/v1/plate': { POST: plateRoute },
@@ -191,7 +178,7 @@ async function handle(request: Request, env: Env, ctx: ExecutionContext): Promis
       });
     }
 
-    // Generated previews are served from a path with the object name in it,
+    // Generated pictures are served from a path with the object name in it,
     // so it cannot be a fixed route.
     if (url.pathname.startsWith('/v1/preview/') && request.method === 'GET') {
       try {

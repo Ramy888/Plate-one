@@ -87,7 +87,7 @@ export async function recordEvent(
   env: Env,
   fields: {
     deviceId: string;
-    kind: 'scan' | 'preview' | 'plate' | 'voice';
+    kind: 'plate' | 'voice';
     model: string;
     durationMs: number;
     outcome: 'ok' | 'empty' | 'error';

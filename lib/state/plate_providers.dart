@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,6 +45,56 @@ class PlateVisualController extends Notifier<PlateVisual> {
   /// the user has already moved on from is dropped rather than shown.
   String _wanted = '';
 
+  /// The plate we would draw next, and whether one is already being drawn.
+  ///
+  /// A conversation moves faster than a picture: someone naming three foods
+  /// produces three plates in a few seconds, and a draw takes a few seconds
+  /// each. Firing them all meant paying for pictures nobody ever saw and
+  /// leaving the plate permanently a draw behind.
+  ({List<String> foodIds, String additionId})? _pending;
+  bool _drawing = false;
+  Timer? _settle;
+
+  /// How long the meal has to stop changing before it is worth drawing.
+  /// "Rice" then "and chicken" then "and a salad" is one plate, not three.
+  static const _settleDelay = Duration(milliseconds: 800);
+
+  /// Asks for a plate.
+  ///
+  /// Never blocks and never queues more than one: the latest request wins, and
+  /// it waits for whatever is already in flight rather than racing it.
+  void request({
+    required List<String> foodIds,
+    String additionId = '',
+    bool now = false,
+  }) {
+    _pending = (foodIds: [...foodIds], additionId: additionId);
+    _settle?.cancel();
+    // A tap is a person waiting. A meal changing mid-sentence is not.
+    if (now) {
+      unawaited(_drain());
+    } else {
+      _settle = Timer(_settleDelay, () => unawaited(_drain()));
+    }
+  }
+
+  Future<void> _drain() async {
+    // Already drawing: the running draw picks up whatever is pending when it
+    // finishes, so the plate ends up at the latest state having drawn once.
+    if (_drawing) return;
+    final next = _pending;
+    if (next == null) return;
+
+    _pending = null;
+    _drawing = true;
+    try {
+      await load(foodIds: next.foodIds, additionId: next.additionId);
+    } finally {
+      _drawing = false;
+      if (_pending != null) unawaited(_drain());
+    }
+  }
+
   /// Draws a plate.
   ///
   /// An empty [additionId] means the meal on its own, which is what the plate
@@ -69,7 +120,7 @@ class PlateVisualController extends Notifier<PlateVisual> {
             foodIds: foodIds,
             additionId: additionId,
           );
-      if (_wanted != key) return;
+      if (_stale(key)) return;
 
       Uint8List? image;
       if (reply.imageUrl != null) {
@@ -81,7 +132,7 @@ class PlateVisualController extends Notifier<PlateVisual> {
           // The words still stand.
         }
       }
-      if (_wanted != key) return;
+      if (_stale(key)) return;
 
       state = PlateVisual(
         messageId: reply.messageId,
@@ -91,15 +142,27 @@ class PlateVisualController extends Notifier<PlateVisual> {
       );
       ref.read(scanControllerProvider.notifier).noteQuota(reply.quota);
     } on ScanFailure {
-      if (_wanted != key) return;
+      if (_stale(key)) return;
       state = const PlateVisual(unavailable: true);
     } catch (_) {
-      if (_wanted != key) return;
+      if (_stale(key)) return;
       state = const PlateVisual(unavailable: true);
     }
   }
 
+  /// Whether this answer is still wanted.
+  ///
+  /// Two ways it stops being: the plate moved on while it was being drawn, or
+  /// the screen it was for is gone. The second one matters as much as the
+  /// first — a draw that lands after the conversation ended would put the old
+  /// meal back on a plate somebody has already cleared, and writing to a
+  /// disposed provider throws where nobody is catching.
+  bool _stale(String key) => _wanted != key || !ref.mounted;
+
   void clear() {
+    _settle?.cancel();
+    _settle = null;
+    _pending = null;
     _wanted = '';
     state = const PlateVisual();
   }

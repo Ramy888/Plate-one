@@ -104,8 +104,8 @@ describe('device registration', () => {
     // decision and a test that hard-codes them fails for the wrong reason
     // every time one is tuned.
     expect(quota).toMatchObject({
-      scans: Number(env.SCANS_PER_DAY),
       previews: Number(env.PREVIEWS_PER_DAY),
+      voice: Number(env.VOICE_SESSIONS_PER_DAY),
     });
   });
 
@@ -156,7 +156,7 @@ describe('quota endpoint', () => {
     const { deviceToken } = await register();
     for (let i = 0; i < 3; i++) {
       const quota = (await (await call('GET', '/v1/quota', { token: deviceToken })).json()) as Quota;
-      expect(quota.scans).toBe(8);
+      expect(quota.previews).toBe(Number(env.PREVIEWS_PER_DAY));
     }
   });
 });
@@ -167,10 +167,10 @@ describe('quota bookkeeping', () => {
     const stub = await quotaStub(deviceToken);
     await runInDurableObject(stub, async (instance: QuotaCounter) => {
       const t = Math.floor(Date.now() / 1000);
-      await instance.spend('scan', t);
-      expect((await instance.peek(t)).scans).toBe(7);
-      await instance.refund('scan', t);
-      expect((await instance.peek(t)).scans).toBe(8);
+      await instance.spend('preview', t);
+      expect((await instance.peek(t)).previews).toBe(Number(env.PREVIEWS_PER_DAY) - 1);
+      await instance.refund('preview', t);
+      expect((await instance.peek(t)).previews).toBe(Number(env.PREVIEWS_PER_DAY));
     });
   });
 
@@ -179,9 +179,9 @@ describe('quota bookkeeping', () => {
     const stub = await quotaStub(deviceToken);
     await runInDurableObject(stub, async (instance: QuotaCounter) => {
       const t = Math.floor(Date.now() / 1000);
-      await instance.refund('scan', t);
-      await instance.refund('scan', t);
-      expect((await instance.peek(t)).scans).toBe(8);
+      await instance.refund('preview', t);
+      await instance.refund('preview', t);
+      expect((await instance.peek(t)).previews).toBe(Number(env.PREVIEWS_PER_DAY));
     });
   });
 
@@ -191,11 +191,11 @@ describe('quota bookkeeping', () => {
     const stubA = await quotaStub(a.deviceToken);
     await runInDurableObject(stubA, async (instance: QuotaCounter) => {
       const t = Math.floor(Date.now() / 1000);
-      for (let i = 0; i < 8; i++) await instance.spend('scan', t);
+      for (let i = 0; i < 8; i++) await instance.spend('preview', t);
     });
 
     const quotaB = (await (await call('GET', '/v1/quota', { token: b.deviceToken })).json()) as Quota;
-    expect(quotaB.scans).toBe(8);
+    expect(quotaB.previews).toBe(Number(env.PREVIEWS_PER_DAY));
   });
 });
 
@@ -219,7 +219,7 @@ describe('reporting AI results', () => {
     const { deviceToken } = await register();
     await call('POST', '/v1/report', {
       token: deviceToken,
-      body: { targetType: 'scan', targetId: 'sc_2', reason: 'something else entirely' },
+      body: { targetType: 'preview', targetId: 'sc_2', reason: 'something else entirely' },
     });
     const row = await env.DB.prepare('SELECT reason FROM reports').first<{ reason: string }>();
     expect(row?.reason).toBe('other');
@@ -242,7 +242,7 @@ describe('deleting a device', () => {
     const { deviceToken } = await register();
     await call('POST', '/v1/report', {
       token: deviceToken,
-      body: { targetType: 'scan', targetId: 'sc_3', reason: 'other' },
+      body: { targetType: 'preview', targetId: 'sc_3', reason: 'other' },
     });
 
     expect((await call('DELETE', '/v1/device', { token: deviceToken })).status).toBe(204);
@@ -264,13 +264,13 @@ describe('deleting a device', () => {
     const stub = await quotaStub(deviceToken);
     await runInDurableObject(stub, async (instance: QuotaCounter) => {
       const t = Math.floor(Date.now() / 1000);
-      for (let i = 0; i < 8; i++) await instance.spend('scan', t);
+      for (let i = 0; i < 8; i++) await instance.spend('preview', t);
     });
 
     await call('DELETE', '/v1/device', { token: deviceToken });
 
     await runInDurableObject(stub, async (instance: QuotaCounter) => {
-      expect((await instance.peek(Math.floor(Date.now() / 1000))).scans).toBe(8);
+      expect((await instance.peek(Math.floor(Date.now() / 1000))).previews).toBe(Number(env.PREVIEWS_PER_DAY));
     });
   });
 });

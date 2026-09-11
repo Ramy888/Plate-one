@@ -99,34 +99,40 @@ export async function postPlate(request: Request, env: Env): Promise<Response> {
       : `On the plate: ${plate}.\nAdding: ${ADDITION_PHRASES[additionId]}.`;
 
   const started = Date.now();
-  let result: PlateReply;
-  try {
-    result = await generateJson<PlateReply>(env, {
-      model: env.MODEL_CHAT,
-      system: PLATE_SYSTEM,
-      schema: PLATE_SCHEMA,
-      prompt,
-    });
-  } catch (error) {
-    await stub.refund('preview', t);
-    await recordEvent(
-      env,
-      {
-        deviceId: device.id,
-        kind: 'plate',
-        model: env.MODEL_CHAT,
-        durationMs: Date.now() - started,
-        outcome: 'error',
-      },
-      t,
-    );
-    if (error instanceof GeminiError && error.status === 422) {
-      throw new ApiError(422, 'plate_blocked', 'That plate could not be written up.');
-    }
-    throw new ApiError(503, 'plate_unavailable', 'Busy right now. Try again shortly.');
-  }
 
-  const reply = String(result.reply ?? '').slice(0, 800);
+  // A plate with nothing added to it needs no caption. Nothing displays one —
+  // the words are about the addition, and there is not one yet — so asking a
+  // model to write it is a second round trip for something nobody reads.
+  let reply = '';
+  if (additionId !== '') {
+    let result: PlateReply;
+    try {
+      result = await generateJson<PlateReply>(env, {
+        model: env.MODEL_CHAT,
+        system: PLATE_SYSTEM,
+        schema: PLATE_SCHEMA,
+        prompt,
+      });
+    } catch (error) {
+      await stub.refund('preview', t);
+      await recordEvent(
+        env,
+        {
+          deviceId: device.id,
+          kind: 'plate',
+          model: env.MODEL_CHAT,
+          durationMs: Date.now() - started,
+          outcome: 'error',
+        },
+        t,
+      );
+      if (error instanceof GeminiError && error.status === 422) {
+        throw new ApiError(422, 'plate_blocked', 'That plate could not be written up.');
+      }
+      throw new ApiError(503, 'plate_unavailable', 'Busy right now. Try again shortly.');
+    }
+    reply = String(result.reply ?? '').slice(0, 800);
+  }
 
   // The picture is a bonus. A failure here still returns the words, the same
   // way a failed preview leaves the patch untouched.

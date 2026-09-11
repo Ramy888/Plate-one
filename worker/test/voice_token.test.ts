@@ -145,7 +145,7 @@ describe('what it costs', () => {
       const quota = await instance.peek(Math.floor(Date.now() / 1000));
       expect(quota.voice).toBe(11);
       // A conversation is not a meal scan and not a picture.
-      expect(quota.scans).toBe(8);
+      expect(quota.previews).toBe(Number(env.PREVIEWS_PER_DAY));
       expect(quota.previews).toBe(Number(env.PREVIEWS_PER_DAY));
     });
   });

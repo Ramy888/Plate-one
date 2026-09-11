@@ -15,7 +15,6 @@ import { DurableObject } from 'cloudflare:workers';
  */
 
 export interface QuotaState {
-  scansUsed: number;
   previewsUsed: number;
   voiceUsed: number;
   /** Unix seconds at which the current counting window opened. */
@@ -25,7 +24,6 @@ export interface QuotaState {
 /** What the app is told. Enough to render the right screen without guessing. */
 export interface QuotaView {
   /** What is left today, not what has been spent. */
-  scans: number;
   previews: number;
   /** Voice sessions. The main feature, so the most generous of the three. */
   voice: number;
@@ -35,20 +33,15 @@ export interface QuotaView {
 const DAY = 24 * 60 * 60;
 
 /** Daily caps per device. A spend ceiling, not a monetisation lever. */
-export const SCANS_PER_DAY = 8;
 export const PREVIEWS_PER_DAY = 4;
 export const VOICE_SESSIONS_PER_DAY = 12;
 
 /** The three things that cost money, and the only things counted here. */
-export type Spend = 'scan' | 'preview' | 'voice';
+export type Spend = 'preview' | 'voice';
 
-const EMPTY: QuotaState = { scansUsed: 0, previewsUsed: 0, voiceUsed: 0, windowStart: 0 };
+const EMPTY: QuotaState = { previewsUsed: 0, voiceUsed: 0, windowStart: 0 };
 
 export class QuotaCounter extends DurableObject<Env> {
-  private get scansPerDay(): number {
-    return Number(this.env.SCANS_PER_DAY ?? SCANS_PER_DAY);
-  }
-
   private get previewsPerDay(): number {
     return Number(this.env.PREVIEWS_PER_DAY ?? PREVIEWS_PER_DAY);
   }
@@ -73,7 +66,6 @@ export class QuotaCounter extends DurableObject<Env> {
 
   private view(state: QuotaState): QuotaView {
     return {
-      scans: Math.max(0, this.scansPerDay - state.scansUsed),
       previews: Math.max(0, this.previewsPerDay - state.previewsUsed),
       voice: Math.max(0, this.voicePerDay - state.voiceUsed),
       resetsAt: state.windowStart + DAY,
@@ -83,7 +75,6 @@ export class QuotaCounter extends DurableObject<Env> {
   private static spent(state: QuotaState, kind: Spend, by: number): QuotaState {
     return {
       ...state,
-      scansUsed: state.scansUsed + (kind === 'scan' ? by : 0),
       previewsUsed: state.previewsUsed + (kind === 'preview' ? by : 0),
       voiceUsed: state.voiceUsed + (kind === 'voice' ? by : 0),
     };
@@ -101,7 +92,7 @@ export class QuotaCounter extends DurableObject<Env> {
   async spend(kind: Spend, now: number): Promise<{ ok: boolean; quota: QuotaView }> {
     const state = await this.load(now);
     const before = this.view(state);
-    if (before[kind === 'scan' ? 'scans' : kind === 'preview' ? 'previews' : 'voice'] <= 0) {
+    if (before[kind === 'preview' ? 'previews' : 'voice'] <= 0) {
       return { ok: false, quota: before };
     }
 
@@ -120,7 +111,6 @@ export class QuotaCounter extends DurableObject<Env> {
     await this.ctx.storage.put('state', {
       ...given,
       // A refund must never mint allowance out of nothing.
-      scansUsed: Math.max(0, given.scansUsed),
       previewsUsed: Math.max(0, given.previewsUsed),
       voiceUsed: Math.max(0, given.voiceUsed),
     });

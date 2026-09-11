@@ -8,7 +8,7 @@ import {
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import worker from '../src/index';
-import { quotaForDevice } from './helpers';
+import { globalCap, quotaForDevice } from './helpers';
 import type { QuotaCounter } from '../src/quota';
 
 const BASE = 'https://api.plateone.app';
@@ -108,20 +108,30 @@ beforeEach(async () => {
 });
 
 describe('drawing the meal as it is described', () => {
-  it('draws a plate with no addition on it', async () => {
+  it('draws a plate with no addition on it, and writes no caption', async () => {
     // The voice screen draws the meal while the conversation is still filling
-    // it in, long before anything has been suggested.
+    // it in, long before anything has been suggested. Nothing displays a
+    // caption at that point, so asking a model for one is a round trip spent
+    // on something nobody reads — and no interceptor is registered here, so a
+    // caption call would fail against disableNetConnect rather than pass
+    // quietly.
     const images = stubImages();
-    interceptCaption('Rice and chicken.');
 
     const response = await send(
       plateRequest(await register(), { foodIds: ['white_rice', 'chicken'] }),
     );
 
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { imageUrl: string; additionId: string };
-    expect(body.additionId).toBe('');
-    expect(body.imageUrl).toContain('/v1/preview/');
+    {
+      const body = (await response.json()) as {
+        imageUrl: string;
+        additionId: string;
+        reply: string;
+      };
+      expect(body.additionId).toBe('');
+      expect(body.reply).toBe('');
+      expect(body.imageUrl).toContain('/v1/preview/');
+    }
     // Nothing is being added, so the prompt must not claim anything is.
     expect(images.prompts).toHaveLength(1);
     expect(images.prompts[0]).not.toContain('added to the side');
@@ -192,7 +202,6 @@ describe('the same plate is only drawn once', () => {
     // "rice and chicken" and "chicken and rice" are one meal. Someone naming
     // them in a different order must not pay for a second picture of it.
     const images = stubImages();
-    interceptCaption('Rice and chicken.');
     const token = await register();
 
     await send(plateRequest(token, { foodIds: ['white_rice', 'chicken'] }));
@@ -230,7 +239,6 @@ describe('the same plate is only drawn once', () => {
     // The key is no longer a UUID, and the route that reads it validates the
     // shape. A cache nobody can read back is not a cache.
     const images = stubImages();
-    interceptCaption('Rice.');
     const token = await register();
 
     const drawn = await send(plateRequest(token, { foodIds: ['white_rice'] }));
@@ -242,5 +250,73 @@ describe('the same plate is only drawn once', () => {
     expect(picture.status).toBe(200);
     expect(picture.headers.get('content-type')).toContain('image/jpeg');
     images.restore();
+  });
+});
+
+describe('what a picture costs', () => {
+  it('refuses once the device allowance is gone, without calling a model', async () => {
+    const token = await register();
+    await runInDurableObject(await quotaForDevice(token), async (q: QuotaCounter) => {
+      const t = Math.floor(Date.now() / 1000);
+      const limit = Number(env.PREVIEWS_PER_DAY);
+      for (let i = 0; i < limit; i++) await q.spend('preview', t);
+    });
+
+    // No interceptor and no image stub: if this reaches either model, it fails
+    // against disableNetConnect rather than passing quietly.
+    const response = await send(plateRequest(token, { foodIds: ['white_rice'] }));
+    expect(response.status).toBe(402);
+    expect(((await response.json()) as { error: string }).error).toBe('quota_exhausted');
+  });
+
+  it('refuses a paid call once the deployment’s budget is gone', async () => {
+    // The per-device allowance stops one phone running up a bill. This is the
+    // one that stops a hundred phones, or a script rotating device ids, and it
+    // is the only thing standing between a public demo URL and an empty API
+    // account — so it is tested through a route, not just the counter.
+    const token = await register();
+    const t = Math.floor(Date.now() / 1000);
+    try {
+      await runInDurableObject(globalCap(), async (instance) => {
+        let last = await instance.spend(t);
+        while (last.ok) last = await instance.spend(t);
+      });
+
+      const response = await send(plateRequest(token, { foodIds: ['white_rice'] }));
+      expect(response.status).toBe(429);
+      expect(((await response.json()) as { error: string }).error).toBe('service_busy');
+    } finally {
+      // Shared across every suite in the run — storage isolation is off — so
+      // this belongs in `finally`, not at the end of the happy path.
+      await runInDurableObject(globalCap(), async (_instance, state) => {
+        await state.storage.deleteAll();
+      });
+    }
+  });
+
+  it('caps paid calls per IP as well as per device', async () => {
+    const ip = '203.0.113.77';
+    let limited = false;
+    for (let i = 0; i < 60 && !limited; i++) {
+      const token = await register();
+      // Empty the device allowance so the IP ceiling is what is being measured.
+      await runInDurableObject(await quotaForDevice(token), async (q: QuotaCounter) => {
+        const t = Math.floor(Date.now() / 1000);
+        const limit = Number(env.PREVIEWS_PER_DAY);
+        for (let j = 0; j < limit; j++) await q.spend('preview', t);
+      });
+
+      const request = new Request(`${BASE}/v1/plate`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+          'cf-connecting-ip': ip,
+        },
+        body: JSON.stringify({ foodIds: ['white_rice'] }),
+      });
+      if ((await send(request)).status === 429) limited = true;
+    }
+    expect(limited, 'plates were never rate limited per IP').toBe(true);
   });
 });

@@ -159,17 +159,19 @@ final agentToolsProvider = Provider<AgentTools>((ref) {
     // once; the picture catches up.
     onChoose: ({required patch, required foodIds}) {
       ref.read(chosenPatchProvider.notifier).set(patch);
-      unawaited(
-        ref.read(plateVisualProvider.notifier).load(
-              foodIds: foodIds,
-              additionId: patch.addition.id,
-            ),
-      );
+      ref.read(plateVisualProvider.notifier).request(
+            foodIds: foodIds,
+            additionId: patch.addition.id,
+            // Somebody is waiting for this one.
+            now: true,
+          );
     },
-    // The plate catches up with the meal, without an addition on it yet.
+    // The plate catches up with the meal, without an addition on it yet. Not
+    // at once: the conversation is still going, and drawing every food as it
+    // is named costs a picture each and leaves the plate a draw behind.
     onMealChanged: (foodIds) {
       ref.read(chosenPatchProvider.notifier).set(null);
-      unawaited(ref.read(plateVisualProvider.notifier).load(foodIds: foodIds));
+      ref.read(plateVisualProvider.notifier).request(foodIds: foodIds);
     },
     onRecommendations: (options) =>
         ref.read(voiceConversationProvider.notifier).offer(options),
@@ -270,12 +272,11 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
   /// Draws one of the offered options, as though it had been agreed out loud.
   void choose(Patch patch) {
     ref.read(chosenPatchProvider.notifier).set(patch);
-    unawaited(
-      ref.read(plateVisualProvider.notifier).load(
-            foodIds: ref.read(mealDraftProvider).foodIds.toList(),
-            additionId: patch.addition.id,
-          ),
-    );
+    ref.read(plateVisualProvider.notifier).request(
+          foodIds: ref.read(mealDraftProvider).foodIds.toList(),
+          additionId: patch.addition.id,
+          now: true,
+        );
   }
 
   Future<void> stop() async {

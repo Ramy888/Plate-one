@@ -70,7 +70,6 @@
     // Per device, per day. There is no paid tier: these are spend ceilings, not
     // a monetisation lever. Voice is the most generous because it is the
     // product; the other two are supporting features.
-    "SCANS_PER_DAY": "8",
     // Pictures. The voice screen redraws the plate as the meal fills in and
     // again for each suggestion tried, so one conversation is several — far
     // more than the photo-editing preview ever needed. Repeats are free: the
