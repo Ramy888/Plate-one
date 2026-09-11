@@ -280,9 +280,36 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
 
   Future<void> stop() async {
     final session = _session;
-    if (session == null) return;
-    await session.stop();
-    if (session.failure != null) state = state.copyWith(failure: session.failure);
+    if (session != null) {
+      await session.stop();
+      if (session.failure != null) {
+        // A conversation that ended badly keeps its reason on screen; one the
+        // person ended themselves has nothing to explain.
+        state = VoiceConversationState(
+          agent: VoiceAgentState.ended,
+          failure: session.failure,
+        );
+        _clearPlate();
+        return;
+      }
+    }
+    reset();
+  }
+
+  /// Back to an empty plate and an empty thread.
+  ///
+  /// Ending the conversation ends the meal with it. Leaving the last plate and
+  /// its transcript on screen would mean the next person to speak starts by
+  /// clearing away somebody else's dinner.
+  void reset() {
+    state = const VoiceConversationState();
+    _clearPlate();
+  }
+
+  void _clearPlate() {
+    ref.read(chosenPatchProvider.notifier).set(null);
+    ref.read(plateVisualProvider.notifier).clear();
+    ref.read(mealDraftProvider.notifier).reset();
   }
 
   void _onEvent(VoiceEvent event) {

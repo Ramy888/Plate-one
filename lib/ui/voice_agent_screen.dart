@@ -63,66 +63,182 @@ class VoiceAgentScreen extends ConsumerWidget {
         top: false,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // Side by side once there is room for it. On a phone the plate sits
-            // above the conversation; on a tablet or a browser window they are
-            // columns, because a chat stretched across 1600 pixels is a chat
-            // nobody can read a line of.
+            // Idle is the plate on its own, centred, with the microphone under
+            // it. Everything else is the conversation, which arrives beside the
+            // plate rather than in place of it.
+            final active = voice.isLive || voice.turns.isNotEmpty;
             final wide = constraints.maxWidth >= 840;
 
-            final conversation = Column(
-              children: [
-                _AgentState(state: voice),
-                Expanded(
-                  child: voice.turns.isEmpty
-                      ? _Waiting(live: voice.isLive)
-                      : _Thread(turns: voice.turns),
-                ),
-                if (voice.failure case final failure?) _Failure(message: failure),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: Space.md),
-                  child: MicButton(
-                    onTap: voice.isLive ? conversation0.stop : conversation0.start,
-                    listening: voice.isLive,
-                    tooltip: voice.isLive ? 'End the conversation' : 'Start talking',
-                  ),
-                ),
-              ],
+            final plateSize = wide
+                ? (constraints.maxWidth / 3).clamp(200.0, 320.0)
+                : (constraints.maxHeight * (active ? 0.28 : 0.38)).clamp(110.0, 260.0);
+
+            final column = _PlateColumn(
+              voice: voice,
+              plateSize: plateSize,
+              compact: !wide,
+              onMic: voice.isLive ? conversation0.stop : conversation0.start,
             );
 
+            final thread = voice.turns.isEmpty
+                ? _Waiting(live: voice.isLive)
+                : _Thread(turns: voice.turns);
+
             if (!wide) {
-              final plate = (constraints.maxHeight * 0.30).clamp(110.0, 240.0);
+              // Idle is the plate in the middle of the screen with the
+              // microphone under it, and nothing else at all.
+              if (!active) {
+                return Center(child: SingleChildScrollView(child: column));
+              }
               return Column(
                 children: [
-                  _Plate(size: plate),
-                  const _SelectedPatch(compact: true),
-                  Expanded(child: conversation),
+                  // Bounded and scrollable: with a failure card in it this
+                  // column is taller than the top half of a small phone, and
+                  // an overflow there hides the microphone.
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: constraints.maxHeight * 0.58,
+                    ),
+                    child: SingleChildScrollView(child: column),
+                  ),
+                  Expanded(child: thread),
                 ],
               );
             }
 
-            // A third of the width for the plate and what was chosen, the rest
-            // for the conversation.
-            final plate = (constraints.maxWidth / 3).clamp(200.0, 340.0);
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            final chatWidth = constraints.maxWidth * 2 / 3;
+            return Stack(
               children: [
-                SizedBox(
-                  width: constraints.maxWidth / 3,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        _Plate(size: plate),
-                        const _SelectedPatch(compact: false),
-                      ],
-                    ),
+                // Grows in on the left; the plate gets out of its way.
+                AnimatedPositioned(
+                  duration: _move,
+                  curve: Curves.easeOutCubic,
+                  left: active ? 0 : -chatWidth,
+                  top: 0,
+                  bottom: 0,
+                  width: chatWidth,
+                  child: AnimatedOpacity(
+                    duration: _move,
+                    opacity: active ? 1 : 0,
+                    child: thread,
                   ),
                 ),
-                const VerticalDivider(width: 1, color: PlateColors.line),
-                Expanded(child: conversation),
+                // Centred when there is nothing else on screen, over to the
+                // right once there is.
+                AnimatedAlign(
+                  duration: _move,
+                  curve: Curves.easeOutCubic,
+                  alignment: active ? Alignment.centerRight : Alignment.center,
+                  child: SizedBox(
+                    width: constraints.maxWidth / 3,
+                    child: SingleChildScrollView(child: column),
+                  ),
+                ),
               ],
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+/// How long the plate takes to get out of the way. Long enough to follow,
+/// short enough that nobody waits for it.
+const _move = Duration(milliseconds: 420);
+
+/// The plate, what was chosen, and the microphone — the part of the screen
+/// that is always there.
+class _PlateColumn extends StatelessWidget {
+  const _PlateColumn({
+    required this.voice,
+    required this.plateSize,
+    required this.compact,
+    required this.onMic,
+  });
+
+  final VoiceConversationState voice;
+  final double plateSize;
+  final bool compact;
+  final VoidCallback onMic;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const _FavouriteBanner(),
+        _Plate(size: plateSize),
+        _SelectedPatch(compact: compact),
+        _AgentState(state: voice),
+        if (voice.failure case final failure?) _Failure(message: failure),
+        Padding(
+          padding: const EdgeInsets.only(bottom: Space.md, top: Space.xs),
+          child: MicButton(
+            onTap: onMic,
+            listening: voice.isLive,
+            tooltip: voice.isLive ? 'End the conversation' : 'Start talking',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Keeping the plate, offered above it once there is something to keep.
+///
+/// Above rather than below because it is about the picture, and because the
+/// space under the plate is already spoken for by what was chosen.
+class _FavouriteBanner extends ConsumerWidget {
+  const _FavouriteBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chosen = ref.watch(chosenPatchProvider);
+    if (chosen == null) return const SizedBox.shrink();
+
+    final visual = ref.watch(plateVisualProvider);
+    final result = ref.watch(patchResultProvider);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.sm),
+      child: FilledButton.icon(
+        onPressed: () async {
+          await savePatch(
+            context,
+            ref,
+            slot: result.slot,
+            foodIds: result.foods.map((f) => f.id).toList(),
+            addition: chosen.addition,
+            gapIds: result.gaps.map((g) => g.id).toList(),
+            image: visual.image,
+            // The conversation is over once the plate is kept, and the screen
+            // says so by clearing itself rather than by navigating somewhere.
+            askHowItWent: false,
+            returnToStart: false,
+          );
+          if (!context.mounted) return;
+
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(
+              SnackBar(
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: PlateColors.green,
+                content: Text(
+                  'Saved. That plate is in your favourites.',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: PlateColors.neutral100),
+                ),
+              ),
+            );
+
+          await ref.read(voiceConversationProvider.notifier).stop();
+        },
+        icon: const Icon(LucideIcons.heart, size: 18),
+        label: const Text('Add this plate to favourite plates'),
       ),
     );
   }
@@ -615,7 +731,7 @@ class _OptionCard extends StatelessWidget {
 /// It changes with the selection rather than appearing once at the end: the
 /// point of tapping through the options is seeing each one land.
 class _SelectedPatch extends ConsumerWidget {
-  const _SelectedPatch({required this.compact});
+  const _SelectedPatch({this.compact = true});
 
   /// On a phone this sits between the plate and the conversation, and both
   /// need the room.
@@ -625,9 +741,6 @@ class _SelectedPatch extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final chosen = ref.watch(chosenPatchProvider);
     if (chosen == null) return const SizedBox.shrink();
-
-    final visual = ref.watch(plateVisualProvider);
-    final result = ref.watch(patchResultProvider);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, compact ? Space.sm : Space.md),
@@ -651,23 +764,6 @@ class _SelectedPatch extends ConsumerWidget {
                     ?.copyWith(color: PlateColors.inkSoft),
               ),
             ],
-            const SizedBox(height: Space.xs),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => savePatch(
-                  context,
-                  ref,
-                  slot: result.slot,
-                  foodIds: result.foods.map((f) => f.id).toList(),
-                  addition: chosen.addition,
-                  gapIds: result.gaps.map((g) => g.id).toList(),
-                  image: visual.image,
-                ),
-                icon: const Icon(LucideIcons.bookmark, size: 18),
-                label: const Text('Keep this'),
-              ),
-            ),
           ],
         ),
       ),

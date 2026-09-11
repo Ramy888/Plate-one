@@ -22,6 +22,7 @@ Future<void> savePatch(
   List<String> gapIds = const [],
   Uint8List? image,
   bool returnToStart = true,
+  bool askHowItWent = true,
 }) async {
   final id = DateTime.now().microsecondsSinceEpoch.toString();
 
@@ -46,10 +47,16 @@ Future<void> savePatch(
 
   // The after-meal check is the other half of saving: it is what makes the
   // history worth keeping rather than a list of things you once tapped.
-  await Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => CheckScreen(patchId: saved.id)),
-  );
-  if (!context.mounted) return;
+  //
+  // The voice screen skips it and says so with a toast instead. Pushing a
+  // second screen over a conversation someone is still in the middle of is
+  // the wrong shape; the check is still reachable from the saved list.
+  if (askHowItWent) {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => CheckScreen(patchId: saved.id)),
+    );
+    if (!context.mounted) return;
+  }
 
   ref.read(mealDraftProvider.notifier).reset();
   if (returnToStart) {

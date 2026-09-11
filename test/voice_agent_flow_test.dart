@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:plateone/data/patch_images.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -108,6 +110,8 @@ void main() {
           // a model behind it; what is under test here is what the screen does
           // with the answer, not the asking.
           plateVisualProvider.overrideWith(_NoDrawing.new),
+          // Saving writes the picture to disk. There is no disk here.
+          patchImagesProvider.overrideWithValue(MemoryPatchImages()),
         ],
         child: MediaQuery(
           // The skeleton sweep is deliberately endless; a test that settles on
@@ -136,8 +140,11 @@ void main() {
 
   testWidgets('opens quiet, and says what to do', (tester) async {
     await openHome(tester);
+    // Idle is the plate and the microphone, and nothing else. There is no
+    // transcript yet and no empty panel pretending to be one.
     expect(find.text('Tap to talk'), findsOneWidget);
-    expect(find.textContaining('Tap the microphone'), findsOneWidget);
+    expect(find.byType(MicButton), findsOneWidget);
+    expect(find.textContaining('Tap the microphone'), findsNothing);
     expect(session.started, isFalse, reason: 'nothing is spent by arriving');
   });
 
@@ -162,6 +169,9 @@ void main() {
       (VoiceAgentState.ended, 'Ended'),
     ]) {
       session.becomes(next);
+      // Twice: the state arrives on a stream, and the frame that renders it
+      // is the next one.
+      await tester.pump();
       await tester.pump();
       expect(find.text(label), findsOneWidget, reason: 'state $next');
     }
@@ -177,10 +187,12 @@ void main() {
     session.says(const SpeechStarted());
     session.says(const UserTranscriptDelta('rice'));
     await tester.pump();
+    await tester.pump();
     expect(find.text('rice'), findsOneWidget);
 
     session.says(const UserTranscriptDelta('rice and'));
     session.says(const UserTranscriptDelta('rice and chicken'));
+    await tester.pump();
     await tester.pump();
 
     expect(find.text('rice and chicken'), findsOneWidget);
@@ -198,6 +210,7 @@ void main() {
     session.says(const AgentTranscriptDelta('on your '));
     session.says(const AgentTranscriptDelta('plate?'));
     await tester.pump();
+    await tester.pump();
 
     expect(find.text('What is on your plate?'), findsOneWidget);
   });
@@ -211,6 +224,7 @@ void main() {
     session.says(const ReplyStarted('r1'));
     session.says(const AgentTranscript(text: 'Anything green?', interrupted: false));
     await tester.pump();
+    await tester.pump();
 
     expect(find.text('rice and chicken'), findsOneWidget);
     expect(find.text('Anything green?'), findsOneWidget);
@@ -222,6 +236,7 @@ void main() {
 
     session.says(const ReplyStarted('r1'));
     session.says(const AgentTranscript(text: 'Rice is a good base', interrupted: true));
+    await tester.pump();
     await tester.pump();
 
     expect(find.text('you jumped in'), findsOneWidget);
@@ -314,13 +329,16 @@ void main() {
 
     expect(container.read(chosenPatchProvider), isNull);
     // The thread scrolls itself; find the card where it ended up.
+    // The plate slides out of the way when the conversation starts; let it
+    // land before reaching for anything.
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.ensureVisible(find.text(offered.first.addition.name));
     await tester.pump();
     await tester.tap(find.text(offered.first.addition.name));
     await tester.pump();
 
     expect(container.read(chosenPatchProvider)?.addition.id, offered.first.addition.id);
-    expect(find.text('Keep this'), findsOneWidget);
+    expect(find.text('Add this plate to favourite plates'), findsOneWidget);
   });
 
   testWidgets('a settled reply points at the cards rather than duplicating them',
@@ -333,6 +351,7 @@ void main() {
 
     session.says(const ReplyStarted('r1'));
     session.says(const AgentTranscript(text: 'Anything green?', interrupted: false));
+    await tester.pump();
     await tester.pump();
 
     expect(find.text('Select from patches below'), findsOneWidget);
@@ -372,8 +391,10 @@ void main() {
       session.says(const ReplyStarted('r'));
       session.says(AgentTranscript(text: 'reply number $i', interrupted: false));
     }
+    // The events, the frame that renders them, then the scroll that follows.
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('reply number 24'), findsOneWidget);
     expect(find.text('line number 0 on the plate'), findsNothing,
@@ -393,6 +414,9 @@ void main() {
     final offered = container.read(agentToolsProvider).recommendNow();
     await tester.pump();
 
+    // The plate slides out of the way when the conversation starts; let it
+    // land before reaching for anything.
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.ensureVisible(find.text(offered.first.addition.name));
     await tester.pump();
     await tester.tap(find.text(offered.first.addition.name));
@@ -401,7 +425,7 @@ void main() {
     // The plate column and the thread are side by side, and what was chosen
     // sits under the plate rather than at the end of the conversation.
     expect(find.byType(Row), findsWidgets);
-    expect(find.text('Keep this'), findsOneWidget);
+    expect(find.text('Add this plate to favourite plates'), findsOneWidget);
     final plate = tester.getCenter(find.byType(MicButton));
     expect(plate.dx, greaterThan(600), reason: 'the mic is in the right-hand column');
   });
@@ -412,6 +436,56 @@ void main() {
 
     expect(find.byIcon(LucideIcons.utensils), findsOneWidget);
     expect(find.byType(Image), findsOneWidget, reason: 'the brand mark only');
+  });
+
+  testWidgets('ending the conversation clears the plate and the thread',
+      (tester) async {
+    // Leaving the last plate and its transcript on screen would mean the next
+    // person to speak starts by clearing away somebody else's dinner.
+    final container = await openHome(tester);
+    await tapMic(tester);
+    session.becomes(VoiceAgentState.listening);
+    session.says(const SpeechStarted());
+    session.says(const UserTranscript('rice and chicken'));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('rice and chicken'), findsOneWidget);
+
+    await container.read(voiceConversationProvider.notifier).stop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('rice and chicken'), findsNothing);
+    expect(container.read(voiceConversationProvider).turns, isEmpty);
+    expect(container.read(chosenPatchProvider), isNull);
+    expect(container.read(mealDraftProvider).foodIds, isEmpty);
+    // Back to idle: the plate, the microphone, and nothing else.
+    expect(find.text('Tap to talk'), findsOneWidget);
+  });
+
+  testWidgets('keeping the plate says so, then clears the screen', (tester) async {
+    final container = await openHome(tester);
+    await tapMic(tester);
+    container.read(mealDraftProvider.notifier).toggleFood('white_rice');
+    final offered = container.read(agentToolsProvider).recommendNow();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.ensureVisible(find.text(offered.first.addition.name));
+    await tester.pump();
+    await tester.tap(find.text(offered.first.addition.name));
+    await tester.pump();
+
+    // The offer to keep it sits above the plate, not at the end of the thread.
+    expect(find.text('Add this plate to favourite plates'), findsOneWidget);
+    await tester.tap(find.text('Add this plate to favourite plates'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.textContaining('favourites'), findsOneWidget, reason: 'the toast');
+    expect(container.read(historyProvider), hasLength(1));
+
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(container.read(chosenPatchProvider), isNull,
+        reason: 'the screen goes back to idle once the plate is kept');
   });
 
   testWidgets('the answer time is put in front of whoever is watching',
@@ -425,6 +499,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 120));
     session.says(const ReplyStarted('r1'));
     session.says(ReplyAudio(replyId: 'r1', pcm16: Uint8List.fromList([1, 2])));
+    await tester.pump();
     await tester.pump();
 
     expect(find.textContaining('ms'), findsOneWidget);
