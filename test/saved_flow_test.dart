@@ -55,8 +55,9 @@ Future<(ProviderContainer, MemoryPatchImages)> _pump(
   WidgetTester tester, {
   required List<SavedPatch> history,
   Map<String, Uint8List> images = const {},
+  Size size = const Size(1200, 2600),
 }) async {
-  tester.view.physicalSize = const Size(1200, 2600);
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 2.0;
   addTearDown(tester.view.reset);
 
@@ -108,6 +109,22 @@ void main() {
 
     expect(find.byType(Image), findsNothing);
     expect(find.text('Add a side salad'), findsOneWidget);
+  });
+
+  testWidgets('a wide window does not stretch the list across it', (tester) async {
+    // A browser is not a phone. Left alone, a row runs the full width of the
+    // window and puts a thumbnail and a line of text at opposite ends of two
+    // thousand pixels with nothing in between.
+    await _pump(
+      tester,
+      history: [_patch(id: 'p1', imagePath: 'p1.jpg')],
+      images: {'p1.jpg': _png},
+      size: const Size(3200, 1800),
+    );
+
+    final row = tester.getSize(find.byType(PlateCard).first);
+    expect(row.width, lessThanOrEqualTo(720),
+        reason: 'held to a readable column, not the whole window');
   });
 
   testWidgets('tapping a saved row opens its details', (tester) async {

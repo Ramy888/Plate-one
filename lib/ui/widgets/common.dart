@@ -607,3 +607,30 @@ class PatchHighlight extends StatelessWidget {
     );
   }
 }
+
+/// Keeps a page readable on a wide window.
+///
+/// A browser is not a phone. Left alone, every row on these screens stretches
+/// to whatever the window happens to be, so a line of text and a thumbnail sit
+/// at opposite ends of two thousand pixels with nothing in between. This holds
+/// the content to a column and centres it, which is what the phone layout
+/// already was.
+class Readable extends StatelessWidget {
+  const Readable({super.key, required this.child, this.maxWidth = 720});
+
+  final Widget child;
+
+  /// Roughly a tablet in portrait. Wide enough for a card and a picture, not
+  /// so wide that a sentence runs off the edge of what the eye follows.
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    );
+  }
+}

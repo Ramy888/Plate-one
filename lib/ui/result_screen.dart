@@ -78,7 +78,8 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: ListView(
+        child: Readable(
+          child: ListView(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.xl),
           children: [
             _OnYourPlate(foods: result.foods),
@@ -132,6 +133,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
           ],
         ),
       ),
+        ),
     );
   }
 }

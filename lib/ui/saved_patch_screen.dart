@@ -83,7 +83,8 @@ class _SavedPatchScreenState extends ConsumerState<SavedPatchScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: ListView(
+        child: Readable(
+          child: ListView(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.xl),
           children: [
             Text(
@@ -130,6 +131,7 @@ class _SavedPatchScreenState extends ConsumerState<SavedPatchScreen> {
           ],
         ),
       ),
+        ),
     );
   }
 
@@ -187,9 +189,12 @@ class _Picture extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(kRadius),
-          child: SizedBox(
-            height: 220,
-            width: double.infinity,
+          // Square, because the plate in it is. A fixed 220 against the full
+          // width of a browser window is a letterbox slice through the middle
+          // of a round plate — most of the picture cropped away to fill a
+          // shape nothing in it matches.
+          child: AspectRatio(
+            aspectRatio: 1,
             child: image != null
                 ? Image.memory(image!, fit: BoxFit.cover)
                 : Container(

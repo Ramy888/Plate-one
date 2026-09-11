@@ -31,7 +31,8 @@ class SavedScreen extends ConsumerWidget {
                 title: 'Nothing saved yet',
                 message: 'Patch a meal and tap "I\'ll add this" — it will show up here.',
               )
-            : ListView(
+            : Readable(
+                child: ListView(
                 padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.xl),
                 children: [
                   if (all.any((h) => h.satisfaction != null)) ...[
@@ -56,6 +57,7 @@ class SavedScreen extends ConsumerWidget {
                     const SizedBox(height: Space.sm),
                   ],
                 ],
+                ),
               ),
       ),
     );

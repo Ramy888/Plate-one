@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
+import 'widgets/common.dart';
 
 /// Privacy policy and terms, shipped inside the app.
 ///
@@ -35,7 +36,8 @@ class LegalScreen extends StatelessWidget {
       appBar: AppBar(title: Text(title)),
       body: SafeArea(
         top: false,
-        child: ListView(
+        child: Readable(
+          child: ListView(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.xl),
           children: [
             Text('Last updated 10 September 2026',
@@ -50,6 +52,7 @@ class LegalScreen extends StatelessWidget {
           ],
         ),
       ),
+        ),
     );
   }
 

@@ -29,7 +29,8 @@ class SettingsScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Settings')),
       body: SafeArea(
         top: false,
-        child: ListView(
+        child: Readable(
+          child: ListView(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.xl),
           children: [
             const _SectionHeading('Your goal', first: true),
@@ -79,6 +80,7 @@ class SettingsScreen extends ConsumerWidget {
           ],
         ),
       ),
+        ),
     );
   }
 }
