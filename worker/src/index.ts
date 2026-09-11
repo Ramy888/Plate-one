@@ -24,6 +24,7 @@ import {
 } from './http';
 import { sha256Hex } from './crypto';
 import { postPlate } from './plate';
+import { postPromo } from './promo';
 import { getPreview } from './preview';
 import { postVoiceToken } from './voice_token';
 
@@ -155,12 +156,21 @@ async function voiceTokenRoute(request: Request, env: Env): Promise<Response> {
   return postVoiceToken(request, env);
 }
 
+// Guessing a code is the attack. A tight per-IP ceiling is the answer: the
+// codes are short enough to walk through at speed, and nothing else here is
+// stopping that.
+async function promoRoute(request: Request, env: Env): Promise<Response> {
+  await enforceLimit(env, `promo:${clientIp(request)}`, 10, 3600);
+  return postPromo(request, env);
+}
+
 const ROUTES: Record<string, Partial<Record<string, Handler>>> = {
   '/v1/device': { POST: postDevice, DELETE: deleteDevice },
   '/v1/quota': { GET: getQuota },
   '/v1/report': { POST: postReport },
   '/v1/plate': { POST: plateRoute },
   '/v1/voice/token': { POST: voiceTokenRoute },
+  '/v1/promo': { POST: promoRoute },
 };
 
 export default {

@@ -19,6 +19,7 @@ on top of it.
 | `GET` | `/v1/preview/{id}.jpg` | Serve a generated plate |
 | `POST` | `/v1/plate` | Write up and draw a plate. Ids in, never words. Addition optional |
 | `POST` | `/v1/voice/token` | Mint a single-use AssemblyAI Voice Agent token |
+| `POST` | `/v1/promo` | Redeem a code for more conversations |
 | `POST` | `/v1/report` | Report an AI result |
 
 ## Design decisions
@@ -53,6 +54,30 @@ two requests can both read "1 left" and both spend it. A Durable Object is
 single-threaded per id, so the race cannot occur — no transactions, no
 optimistic retries. `QUOTA` has one instance per device; `GLOBAL_CAP` has
 exactly one, for everybody.
+
+**Talking is open; drawing needs a sign-in.** AssemblyAI is free for this
+event, so the conversation costs us nothing and has no door on it. A drawn
+plate is a Gemini call and a Workers AI image — real money — so `/v1/plate`
+requires an account when `GOOGLE_CLIENT_ID` is set, and says so in a sentence
+that also says what still works. With no client id configured the whole thing
+is anonymous again, exactly as before.
+
+A Google ID token is verified here rather than by asking Google: it is an
+RS256 JWT and Google publishes the keys. Signature, audience, issuer, expiry —
+and the audience check is the one that is easy to leave out. A validly signed
+Google token issued to somebody else's application is still validly signed.
+
+**What is stored is a SHA-256 of the Google subject.** Not the subject, not the
+email, not the name. The app needs to know that two devices are the same
+person; a hash answers that and answers nothing else. The allowance is keyed on
+it, so a phone and a laptop share one and signing out and back in does not mint
+a second.
+
+**Promo codes live in a secret, never in this repository.** It is public and
+MIT licensed: a list of codes in the client, a migration or a seed file is a
+list of free credits for everyone who reads it. `PROMO_CODES` is `CODE:grants`
+pairs; `worker/src/promo.ts` explains the rest. Redemptions are recorded per
+person, and a code's total use is capped by `PROMO_USES_PER_CODE`.
 
 **The API key never reaches the client.** A browser cannot set an
 `Authorization` header on a WebSocket, so `/v1/voice/token` mints a single-use
@@ -120,6 +145,7 @@ Vars live in `wrangler.jsonc`. Secrets are set with `wrangler secret put`:
 |---|---|
 | `ASSEMBLYAI_API_KEY` | `/v1/voice/token` returns `voice_unconfigured`, and `/health` says so |
 | `GEMINI_API_KEY` | `/v1/plate` returns a picture with no caption |
+| `PROMO_CODES` | `/v1/promo` refuses every code |
 
 The test run does **not** need either: `vitest.config.ts` binds deliberately fake
 values, so a contributor with no keys still gets a green suite — and the
@@ -136,7 +162,7 @@ npx wrangler r2 bucket create plateone-previews
 cp ../.env.example .dev.vars             # then fill it in
 npm run migrate:local
 npm run dev
-npx vitest run                           # 58 tests
+npx vitest run                           # 85 tests
 ```
 
 The R2 bucket wants a lifecycle rule deleting anything under `p/` after 24

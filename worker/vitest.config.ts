@@ -29,6 +29,13 @@ export default defineWorkersConfig({
             // *other* audience is refused, and that is only meaningful against
             // a value the test controls.
             GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
+            // Test codes, not the real ones. The real ones live in a secret
+            // and never reach this repository — see src/promo.ts.
+            PROMO_CODES: 'PLATE-TEST1:5,PLATE-TEST2:3',
+            // Two, not one: with a cap of one the "already used it" check and
+            // the "already spent" check catch the same case, and neither is
+            // actually proven.
+            PROMO_USES_PER_CODE: '2',
           },
         },
       },

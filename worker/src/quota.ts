@@ -19,6 +19,15 @@ export interface QuotaState {
   voiceUsed: number;
   /** Unix seconds at which the current counting window opened. */
   windowStart: number;
+
+  /**
+   * Extra allowance from a redeemed promo code, on top of the daily one.
+   *
+   * Survives the daily reset rather than being wiped by it: someone handed a
+   * code at nine in the evening should still have it in the morning.
+   */
+  bonusPreviews?: number;
+  bonusVoice?: number;
 }
 
 /** What the app is told. Enough to render the right screen without guessing. */
@@ -28,6 +37,9 @@ export interface QuotaView {
   /** Voice sessions. The main feature, so the most generous of the three. */
   voice: number;
   resetsAt: number;
+
+  /** Whether any of this came from a redeemed code, so the app can say so. */
+  bonus?: boolean;
 }
 
 const DAY = 24 * 60 * 60;
@@ -39,7 +51,13 @@ export const VOICE_SESSIONS_PER_DAY = 12;
 /** The three things that cost money, and the only things counted here. */
 export type Spend = 'preview' | 'voice';
 
-const EMPTY: QuotaState = { previewsUsed: 0, voiceUsed: 0, windowStart: 0 };
+const EMPTY: QuotaState = {
+  previewsUsed: 0,
+  voiceUsed: 0,
+  windowStart: 0,
+  bonusPreviews: 0,
+  bonusVoice: 0,
+};
 
 export class QuotaCounter extends DurableObject<Env> {
   private get previewsPerDay(): number {
@@ -54,7 +72,14 @@ export class QuotaCounter extends DurableObject<Env> {
     const stored = (await this.ctx.storage.get<QuotaState>('state')) ?? { ...EMPTY };
 
     if (stored.windowStart === 0 || now - stored.windowStart >= DAY) {
-      const next: QuotaState = { ...EMPTY, windowStart: now };
+      const next: QuotaState = {
+        ...EMPTY,
+        windowStart: now,
+        // The day resets; what somebody was given does not. Wiping a code at
+        // midnight would make handing one out in the evening close to useless.
+        bonusPreviews: stored.bonusPreviews ?? 0,
+        bonusVoice: stored.bonusVoice ?? 0,
+      };
       await this.ctx.storage.put('state', next);
       return next;
     }
@@ -65,10 +90,13 @@ export class QuotaCounter extends DurableObject<Env> {
   }
 
   private view(state: QuotaState): QuotaView {
+    const bonusPreviews = state.bonusPreviews ?? 0;
+    const bonusVoice = state.bonusVoice ?? 0;
     return {
-      previews: Math.max(0, this.previewsPerDay - state.previewsUsed),
-      voice: Math.max(0, this.voicePerDay - state.voiceUsed),
+      previews: Math.max(0, this.previewsPerDay + bonusPreviews - state.previewsUsed),
+      voice: Math.max(0, this.voicePerDay + bonusVoice - state.voiceUsed),
       resetsAt: state.windowStart + DAY,
+      bonus: bonusVoice > 0 || bonusPreviews > 0,
     };
   }
 
@@ -114,6 +142,26 @@ export class QuotaCounter extends DurableObject<Env> {
       previewsUsed: Math.max(0, given.previewsUsed),
       voiceUsed: Math.max(0, given.voiceUsed),
     });
+  }
+
+  /**
+   * Adds allowance from a redeemed promo code.
+   *
+   * The caller has already checked that the code is real and that this person
+   * has not used it before; this only does the arithmetic.
+   */
+  async grant(
+    now: number,
+    { voice = 0, previews = 0 }: { voice?: number; previews?: number },
+  ): Promise<QuotaView> {
+    const state = await this.load(now);
+    const next: QuotaState = {
+      ...state,
+      bonusVoice: (state.bonusVoice ?? 0) + voice,
+      bonusPreviews: (state.bonusPreviews ?? 0) + previews,
+    };
+    await this.ctx.storage.put('state', next);
+    return this.view(next);
   }
 
   /** Backs "delete my data" with something real. */

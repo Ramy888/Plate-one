@@ -89,6 +89,10 @@
     // sign-in off and /v1/device goes back to anonymous devices.
     "GOOGLE_CLIENT_ID": "",
 
+    // How many people may redeem each promo code. The codes themselves are a
+    // secret — see src/promo.ts — because this repository is public.
+    "PROMO_USES_PER_CODE": "1",
+
     "ALLOWED_ORIGINS": "https://plateone.pages.dev,http://localhost:8080,http://localhost:8000"
   }
 
@@ -96,4 +100,7 @@
   //   ASSEMBLYAI_API_KEY   AssemblyAI key. Never reaches the client — the
   //                        Worker mints a single-use token instead.
   //   GEMINI_API_KEY       Google AI Studio key.
+  //   PROMO_CODES          CODE:grants pairs, comma separated. Deliberately
+  //                        not a var: this file is public, and a code in it
+  //                        is a free credit for everyone who reads the repo.
 }
