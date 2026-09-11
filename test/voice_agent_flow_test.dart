@@ -370,9 +370,9 @@ void main() {
     expect(shownAtFirst, 3);
 
     // The row scrolls; the fourth card starts off the right-hand edge.
-    await tester.ensureVisible(find.text('Show more recommendations'));
+    await tester.ensureVisible(find.text('Show more'));
     await tester.pump();
-    await tester.tap(find.text('Show more recommendations'));
+    await tester.tap(find.text('Show more'));
     await tester.pump();
 
     expect(container.read(voiceConversationProvider).turns.last.shown, 4);

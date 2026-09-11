@@ -654,7 +654,11 @@ class _MoreCard extends StatelessWidget {
               const Icon(LucideIcons.plus, size: 20, color: PlateColors.green),
               const SizedBox(height: Space.sm),
               Text(
-                'Show more recommendations',
+                // Two short words. "Recommendations" is one long one, and at
+                // this card's width it broke mid-word into "rec ommendations".
+                'Show more',
+                softWrap: false,
+                overflow: TextOverflow.fade,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: PlateColors.green,
                     ),
