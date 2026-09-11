@@ -16,9 +16,7 @@ on top of it.
 | `POST` | `/v1/device` | Register an anonymous device, return a token and allowance |
 | `DELETE` | `/v1/device` | Forget the device, its allowance, events and reports |
 | `GET` | `/v1/quota` | Current allowance, without spending any |
-| `POST` | `/v1/scan` | Recognise a meal photo |
-| `POST` | `/v1/preview` | Draw the photographed meal with one addition on it |
-| `GET` | `/v1/preview/{id}.jpg` | Serve a generated picture |
+| `GET` | `/v1/preview/{id}.jpg` | Serve a generated plate |
 | `POST` | `/v1/plate` | Write up and draw a plate. Ids in, never words. Addition optional |
 | `POST` | `/v1/voice/token` | Mint a single-use AssemblyAI Voice Agent token |
 | `POST` | `/v1/report` | Report an AI result |
@@ -29,12 +27,13 @@ on top of it.
 There is no paid tier and nothing to sign into: a judge, or anyone else, opens
 the URL and talks. Two limits stand behind that.
 
-| | Conversations | Scans | Pictures | Window |
-|---|---|---|---|---|
-| Per device | 12 | 8 | 30 | per day |
-| Whole deployment | `GLOBAL_CALLS_PER_DAY` (2000), across all three | | | per day |
+| | Conversations | Pictures | Window |
+|---|---|---|---|
+| Per device | 12 | 30 | per day |
+| Whole deployment | `GLOBAL_CALLS_PER_DAY` (2000), across both | | per day |
 
-Voice is the most generous because it is the product; the other two support it.
+Pictures outnumber conversations because one conversation draws several: the
+plate is redrawn as the meal fills in, and again for each suggestion tried.
 
 The per-device allowance stops one phone running up a bill. It does nothing
 about a hundred phones, or one script rotating device ids — which is exactly
@@ -45,8 +44,9 @@ allowance, so a device is never debited by a service that was never going to
 answer. When it is reached, the app says so in plain words and falls back to
 the offline path.
 
-`worker/test/scan.test.ts` drains it and asserts the route returns 429. Deleting
-the check makes that test fail; that is the only reason to believe it works.
+`worker/test/plate.test.ts` drains it and asserts the route returns 429.
+Deleting the check makes that test fail; that is the only reason to believe it
+works.
 
 **Allowances live in Durable Objects.** Spending is a read-modify-write; in D1
 two requests can both read "1 left" and both spend it. A Durable Object is
@@ -119,7 +119,7 @@ Vars live in `wrangler.jsonc`. Secrets are set with `wrangler secret put`:
 | Secret | Without it |
 |---|---|
 | `ASSEMBLYAI_API_KEY` | `/v1/voice/token` returns `voice_unconfigured`, and `/health` says so |
-| `GEMINI_API_KEY` | `/v1/scan` and `/v1/plate` fail closed |
+| `GEMINI_API_KEY` | `/v1/plate` returns a picture with no caption |
 
 The test run does **not** need either: `vitest.config.ts` binds deliberately fake
 values, so a contributor with no keys still gets a green suite — and the
@@ -136,7 +136,7 @@ npx wrangler r2 bucket create plateone-previews
 cp ../.env.example .dev.vars             # then fill it in
 npm run migrate:local
 npm run dev
-npx vitest run                           # 88 tests
+npx vitest run                           # 58 tests
 ```
 
 The R2 bucket wants a lifecycle rule deleting anything under `p/` after 24

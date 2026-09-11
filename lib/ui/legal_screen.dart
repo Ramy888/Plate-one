@@ -59,9 +59,10 @@ class LegalScreen extends StatelessWidget {
       'Your meals, your goal, your preferences and your history stay on this '
           'device and are never uploaded. There is no account, no sign-in and '
           'nothing to create. The exceptions are the two things that cost money to '
-          'run: photographing a meal, and having a plate drawn. Those send one '
-          'photo, or one list of food names, to be read or drawn — and then it is '
-          'discarded. Everything else works with no network at all.'
+          'run: the spoken conversation, and having a plate drawn. Those stream '
+          'audio to be transcribed, and send one list of food names to be drawn — '
+          'and then both are discarded. Everything else works with no network at '
+          'all.'
     ),
     (
       'What is stored on this device',
@@ -72,20 +73,18 @@ class LegalScreen extends StatelessWidget {
           'uninstalling Plate One deletes the lot.'
     ),
     (
-      'What happens to a photo you scan',
-      'Before it leaves this device, the photo is cropped to the guide circle, '
-          'resized, and stripped of all metadata — so no location, no device model '
-          'and no timestamp travel with it. It is then sent through Plate One’s '
-          'server to Google’s Gemini API, which describes the food it can see. '
-          'Plate One does not store the photo, and Google does not use it to train '
-          'its models. A generated picture is held for up to 24 hours so this '
-          'device can download it, then deleted automatically.'
+      'What happens to what you say',
+      'While the microphone is on, audio is streamed from this device straight '
+          'to AssemblyAI, which turns it into text and answers out loud. It does '
+          'not pass through Plate One’s server, and no recording is kept — on '
+          'this device or anywhere else. The transcript on screen lives only in '
+          'the app’s memory and is gone when the conversation ends.'
     ),
     (
-      'What happens when you open a result',
-      'When a result page opens, the names of the foods on the plate and the one '
-          'addition being suggested are sent to Plate One’s server — nothing else, '
-          'and no free text. A picture of that plate is drawn by Cloudflare '
+      'What happens to the picture of your plate',
+      'The names of the foods on the plate and the one addition being suggested '
+          'are sent to Plate One’s server as catalogue ids — nothing else, and no '
+          'free text, so nothing you said can reach the model that draws it. A picture of that plate is drawn by Cloudflare '
           'Workers AI from a fixed description built out of the app’s own food '
           'list. Neither the list nor the picture is stored on the server beyond '
           'the 24-hour expiry. This part is decoration: the suggestion itself is '
@@ -94,7 +93,7 @@ class LegalScreen extends StatelessWidget {
     ),
     (
       'The anonymous device id',
-      'The first time you use one of the two networked features, this device is '
+      'The first time you speak or a plate is drawn, this device is '
           'given a random id. It is not linked to you, to an email address, or to '
           'anything Google or Apple knows about you. Its only job is to count how '
           'many calls have been made today, so the service cannot be run up by one '
@@ -138,16 +137,17 @@ class LegalScreen extends StatelessWidget {
     (
       'What is asked of you',
       'Do not use Plate One to break the law, do not try to extract the service’s '
-          'credentials or exceed its limits deliberately, and do not photograph '
-          'other people and send it their pictures. The daily allowance exists so '
-          'the service stays available to everyone using it.'
+          'credentials or exceed its limits deliberately, and do not use the '
+          'microphone to send it other people’s conversations. The daily allowance '
+          'exists so the service stays available to everyone using it.'
     ),
     (
       'AI-generated content',
-      'Photographs are read by a model, and the picture of a patched plate is '
-          'drawn by one. Both are approximations: the food in a generated picture '
-          'is illustrative, portion sizes in it mean nothing, and a photograph can '
-          'be read wrongly. Check the list the app shows you before you rely on it. '
+      'What you say is transcribed by a model, and the picture of a patched plate '
+          'is drawn by one. Both are approximations: the food in a generated '
+          'picture is illustrative, portion sizes in it mean nothing, and speech '
+          'can be heard wrongly. Check the list the app shows you before you rely '
+          'on it. '
           'The recommendation itself is not generated — it comes from a fixed set '
           'of rules running on this device, and the same plate always gives the '
           'same answer.'

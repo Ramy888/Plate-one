@@ -52,47 +52,6 @@ class ScanApi {
     return ScanQuota.fromJson(_decode(response));
   }
 
-  /// Sends one already-processed photo for recognition.
-  Future<ScanResponse> scan({
-    required String deviceToken,
-    required Uint8List jpeg,
-  }) async {
-    final request = http.MultipartRequest('POST', _uri('/v1/scan'))
-      ..headers.addAll(_auth(deviceToken))
-      // No explicit content type: the filename is enough, and the Worker
-      // defaults an untyped part to image/jpeg.
-      ..files.add(http.MultipartFile.fromBytes('image', jpeg, filename: 'meal.jpg'));
-
-    final response = await _send(() async {
-      final streamed = await _client.send(request);
-      return http.Response.fromStream(streamed);
-    });
-    return ScanResponse.fromJson(_decode(response));
-  }
-
-  /// Generates a visual preview of the meal with one addition.
-  ///
-  /// Sends the addition's **id**, never its name: the server looks the phrase
-  /// up in a closed set, so nothing a client sends can reach an image prompt.
-  Future<PreviewResult> preview({
-    required String deviceToken,
-    required Uint8List jpeg,
-    required String additionId,
-    String? scanId,
-  }) async {
-    final request = http.MultipartRequest('POST', _uri('/v1/preview'))
-      ..headers.addAll(_auth(deviceToken))
-      ..fields['additionId'] = additionId
-      ..files.add(http.MultipartFile.fromBytes('image', jpeg, filename: 'meal.jpg'));
-    if (scanId != null) request.fields['scanId'] = scanId;
-
-    final response = await _send(() async {
-      final streamed = await _client.send(request);
-      return http.Response.fromStream(streamed);
-    }, timeout: const Duration(seconds: 120));
-    return PreviewResult.fromJson(_decode(response));
-  }
-
   /// Writes up and draws a plate.
   ///
   /// Sends ids, never words. The engine on the device has already chosen the
@@ -216,32 +175,25 @@ class ScanApi {
 enum ScanError {
   offline,
   quotaExhausted,
-  noFoodFound,
-  notAMeal,
   busy,
   rateLimited,
   unauthorized,
-  imageRejected,
-  previewExpired,
+  pictureExpired,
+
+  /// Something the Worker refused to accept. Always a bug on our side: the
+  /// client only ever sends catalogue ids.
+  rejected,
   unknown;
 
   static ScanError fromCode(String code, int status) => switch (code) {
         'quota_exhausted' => ScanError.quotaExhausted,
-        'no_food_found' => ScanError.noFoodFound,
-        'not_a_meal' || 'preview_blocked' => ScanError.notAMeal,
-        'preview_unavailable' => ScanError.busy,
-        'preview_expired' => ScanError.previewExpired,
-        'invalid_addition' || 'invalid_food' => ScanError.imageRejected,
+        'preview_expired' => ScanError.pictureExpired,
+        'plate_unavailable' || 'plate_blocked' => ScanError.busy,
+        'invalid_addition' || 'invalid_food' => ScanError.rejected,
         'voice_unavailable' || 'voice_unconfigured' => ScanError.busy,
-        'invalid_field' => ScanError.imageRejected,
-        'recognition_busy' => ScanError.busy,
+        'invalid_field' => ScanError.rejected,
         'rate_limited' => ScanError.rateLimited,
         'unknown_device' || 'unauthorized' => ScanError.unauthorized,
-        'image_too_large' ||
-        'unsupported_type' ||
-        'missing_image' ||
-        'empty_image' =>
-          ScanError.imageRejected,
         _ => status == 429 ? ScanError.rateLimited : ScanError.unknown,
       };
 
@@ -272,14 +224,12 @@ class DeviceRegistration {
 
 class ScanQuota {
   const ScanQuota({
-    required this.scans,
     required this.previews,
     required this.voice,
     required this.resetsAt,
   });
 
   /// What is left today, not what has been spent.
-  final int scans;
   final int previews;
 
   /// Conversations. The most generous of the three, because it is the product.
@@ -288,17 +238,14 @@ class ScanQuota {
 
   /// Before the device has ever registered.
   static final unknown = ScanQuota(
-    scans: 0,
     previews: 0,
     voice: 0,
     resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
   );
 
-  bool get hasScans => scans > 0;
   bool get hasVoice => voice > 0;
 
   factory ScanQuota.fromJson(Map<String, dynamic> json) => ScanQuota(
-        scans: (json['scans'] as num?)?.toInt() ?? 0,
         previews: (json['previews'] as num?)?.toInt() ?? 0,
         voice: (json['voice'] as num?)?.toInt() ?? 0,
         resetsAt: DateTime.fromMillisecondsSinceEpoch(
@@ -339,29 +286,6 @@ class VoiceToken {
         ),
       );
 }
-
-/// A generated preview, and the label that must travel with it.
-class PreviewResult {
-  const PreviewResult({
-    required this.url,
-    required this.disclaimer,
-    required this.quota,
-  });
-
-  final String url;
-
-  /// Shown with the image, always. Never dismissible.
-  final String disclaimer;
-  final ScanQuota quota;
-
-  factory PreviewResult.fromJson(Map<String, dynamic> json) => PreviewResult(
-        url: json['previewUrl'] as String? ?? '',
-        disclaimer: json['disclaimer'] as String? ??
-            'AI visual preview — appearance and serving size are illustrative.',
-        quota: ScanQuota.fromJson((json['quota'] as Map?)?.cast<String, dynamic>() ?? const {}),
-      );
-}
-
 class ChatReply {
   const ChatReply({
     required this.messageId,
@@ -406,37 +330,6 @@ class ChatReply {
         quota: ScanQuota.fromJson((json['quota'] as Map?)?.cast<String, dynamic>() ?? const {}),
       );
 }
-
-/// What one scan produced. `foods` are raw model labels; matching them onto the
-/// catalogue happens on the device, in [FoodMatcher].
-class ScanResponse {
-  const ScanResponse({
-    required this.scanId,
-    required this.foods,
-    required this.components,
-    required this.quota,
-  });
-
-  final String scanId;
-  final List<({String name, double confidence})> foods;
-  final MealComponents components;
-  final ScanQuota quota;
-
-  factory ScanResponse.fromJson(Map<String, dynamic> json) => ScanResponse(
-        scanId: json['scanId'] as String? ?? '',
-        foods: ((json['foods'] as List?) ?? const [])
-            .map((f) => (
-                  name: (f as Map<String, dynamic>)['name'] as String? ?? '',
-                  confidence: ((f['confidence'] as num?) ?? 0).toDouble(),
-                ))
-            .where((f) => f.name.isNotEmpty)
-            .toList(),
-        components:
-            MealComponents.fromJson((json['components'] as Map?)?.cast<String, dynamic>() ?? const {}),
-        quota: ScanQuota.fromJson((json['quota'] as Map?)?.cast<String, dynamic>() ?? const {}),
-      );
-}
-
 /// What the model could and could not see. Advisory only — the rule engine
 /// still decides everything from the confirmed food list.
 class MealComponents {

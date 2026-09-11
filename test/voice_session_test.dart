@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plateone/data/mic_source.dart';
 import 'package:plateone/data/pcm_player.dart';
-import 'package:plateone/data/scan_api.dart';
+import 'package:plateone/data/api.dart';
 import 'package:plateone/data/voice_agent_events.dart';
 import 'package:plateone/data/voice_agent_session.dart';
 import 'package:stream_channel/stream_channel.dart';
@@ -160,7 +160,6 @@ VoiceToken _token({int maxSessionSeconds = 600, String token = 'tok_live'}) => V
       expiresAt: DateTime.fromMillisecondsSinceEpoch(1789310995000),
       maxSessionSeconds: maxSessionSeconds,
       quota: ScanQuota(
-        scans: 8,
         previews: 4,
         voice: 11,
         resetsAt: DateTime.fromMillisecondsSinceEpoch(1789310995000),

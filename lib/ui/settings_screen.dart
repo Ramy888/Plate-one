@@ -5,8 +5,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../domain/models.dart';
 import '../state/providers.dart';
-import '../data/scan_api.dart';
-import '../state/scan_providers.dart';
+import '../data/api.dart';
+import '../state/api_providers.dart';
 import 'legal_screen.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
@@ -71,7 +71,7 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: Space.sm),
             _LinkRow(label: 'Terms of use', onTap: () => LegalScreen.showTerms(context)),
             const _SectionHeading('Your data'),
-            const _ScanAllowance(),
+            const _VoiceAllowance(),
             const SizedBox(height: Space.sm),
             const _DeleteMyData(),
             const SizedBox(height: Space.lg),
@@ -128,32 +128,32 @@ class _LinkRow extends StatelessWidget {
   }
 }
 
-/// What the scan allowance is, without spending one to find out.
-class _ScanAllowance extends ConsumerWidget {
-  const _ScanAllowance();
+/// How many conversations are left, without spending one to find out.
+class _VoiceAllowance extends ConsumerWidget {
+  const _VoiceAllowance();
 
   static String _describe(ScanQuota? quota) {
-    if (quota == null) return 'Scan a meal to see how many you have left.';
-    if (!quota.hasScans) {
-      return 'None left today. Tapping the meal and picking the food is unlimited.';
+    if (quota == null) return 'Start a conversation to see how many you have left.';
+    if (!quota.hasVoice) {
+      return 'None left today. Picking the food by hand is unlimited, and always will be.';
     }
-    return '${quota.scans} left today';
+    return '${quota.voice} left today';
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final quota = ref.watch(scanControllerProvider).quota;
+    final quota = ref.watch(deviceProvider).quota;
     return PlateCard(
       padding: const EdgeInsets.all(Space.md),
       child: Row(
         children: [
-          const Lead(LucideIcons.camera),
+          const Lead(LucideIcons.mic),
           const SizedBox(width: Space.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('AI meal scans', style: Theme.of(context).textTheme.titleMedium),
+                Text('Conversations today', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 2),
                 Text(_describe(quota), style: Theme.of(context).textTheme.bodyMedium),
               ],
@@ -179,11 +179,12 @@ class _DeleteMyData extends ConsumerWidget {
         backgroundColor: PlateColors.card,
         title: const Text('Delete my data'),
         content: const Text(
-          'This removes your saved patches, their pictures, your conversations '
-          'and your preferences from this phone, and tells our server to forget '
-          'your account — your name, your email, your allowance, and every '
-          'record of a scan.\n\n'
-          'It cannot be undone, and it does not cancel a subscription.',
+          'This removes your saved plates, their pictures and your preferences '
+          'from this device, and tells the server to forget the anonymous id it '
+          'gave you, along with its allowance.\n\n'
+          'There is no account to delete: the server never knew your name or '
+          'your email, and it never stored what you ate.\n\n'
+          'It cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -200,7 +201,7 @@ class _DeleteMyData extends ConsumerWidget {
     );
     if (ok != true || !context.mounted) return;
 
-    await ref.read(scanControllerProvider.notifier).deleteEverything();
+    await ref.read(deviceProvider.notifier).deleteEverything();
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()

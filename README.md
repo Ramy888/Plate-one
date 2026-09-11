@@ -17,7 +17,7 @@ Honest, because a README that describes a feature before it exists is worth no
 more than one that omits a feature that does.
 
 - **Landed:** the recommendation engine, the catalogue, the screens for building
-  a plate by hand, photo recognition, the drawn plate, the Worker with its
+  a plate by hand, the drawn plate, the Worker with its
   per-device allowance and deployment-wide budget cap. 194 + 65 tests.
 - **Next:** the voice session itself. Everything below describing a spoken
   conversation is the design being built toward, not something you can do today.
@@ -72,7 +72,7 @@ lib/
   data/
     catalog.dart          Loads the bundled JSON food catalogue
     prefs_repository.dart On-device persistence (shared_preferences)
-    scan_api.dart         The Worker client
+    api.dart              The Worker client
   state/providers.dart  Riverpod wiring
   ui/                   The screens and the shared widgets
 assets/data/
@@ -83,7 +83,6 @@ worker/                 Cloudflare Worker — holds every key
   src/
     budget.ts           The deployment-wide daily cap
     quota.ts            Per-device allowance and the global cap, as Durable Objects
-    scan.ts             Photo -> Gemini -> confirmed food names
     plate.ts            A written-up, drawn plate. Ids in, never words
     device.ts           Anonymous device identity
 ```

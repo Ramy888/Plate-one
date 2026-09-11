@@ -11,7 +11,7 @@ import '../domain/food_matcher.dart';
 import '../domain/models.dart';
 import 'plate_providers.dart';
 import 'providers.dart';
-import 'scan_providers.dart';
+import 'api_providers.dart';
 
 /// One line in the thread.
 @immutable
@@ -185,10 +185,10 @@ final voiceSessionFactoryProvider = Provider<VoiceSessionFactory>((ref) {
 
   return () => VoiceAgentSession(
         mintToken: () async {
-          final token = await ref.read(scanControllerProvider.notifier).deviceToken();
+          final token = await ref.read(deviceProvider.notifier).token();
           final minted = await ref.read(scanApiProvider).voiceToken(token);
           // Keep the camera's "N left" honest after a conversation spends one.
-          ref.read(scanControllerProvider.notifier).noteQuota(minted.quota);
+          ref.read(deviceProvider.notifier).noteQuota(minted.quota);
           return minted;
         },
         systemPrompt: voiceSystemPrompt,

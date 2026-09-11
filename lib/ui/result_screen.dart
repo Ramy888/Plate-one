@@ -6,9 +6,7 @@ import '../domain/models.dart';
 import '../state/plate_providers.dart';
 import '../state/providers.dart';
 import '../state/save_patch.dart';
-import '../state/scan_providers.dart';
 import 'icons.g.dart';
-import 'preview_screen.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
 import 'widgets/report_sheet.dart';
@@ -115,16 +113,6 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                 ),
                 child: const Text("I'll add this"),
               ),
-              if (ref.watch(scanControllerProvider).photo != null) ...[
-                const SizedBox(height: Space.sm),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                    builder: (_) => PreviewScreen(patch: patch),
-                  )),
-                  icon: const Icon(LucideIcons.sparkles, size: 16),
-                  label: const Text('Use my own photo instead'),
-                ),
-              ],
               if (result.patches.length > 1) ...[
                 const SizedBox(height: Space.xl),
                 Text('Or instead', style: Theme.of(context).textTheme.titleLarge),

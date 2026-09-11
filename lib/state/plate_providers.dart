@@ -3,8 +3,8 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/scan_api.dart';
-import 'scan_providers.dart';
+import '../data/api.dart';
+import 'api_providers.dart';
 
 /// The written-up, drawn version of one patch.
 ///
@@ -114,7 +114,7 @@ class PlateVisualController extends Notifier<PlateVisual> {
     state = PlateVisual(image: state.image, caption: state.caption, loading: true);
 
     try {
-      final token = await ref.read(scanControllerProvider.notifier).deviceToken();
+      final token = await ref.read(deviceProvider.notifier).token();
       final reply = await ref.read(scanApiProvider).plate(
             deviceToken: token,
             foodIds: foodIds,
@@ -140,7 +140,7 @@ class PlateVisualController extends Notifier<PlateVisual> {
         image: image,
         unavailable: image == null,
       );
-      ref.read(scanControllerProvider.notifier).noteQuota(reply.quota);
+      ref.read(deviceProvider.notifier).noteQuota(reply.quota);
     } on ScanFailure {
       if (_stale(key)) return;
       state = const PlateVisual(unavailable: true);

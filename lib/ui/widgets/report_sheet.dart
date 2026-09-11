@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../state/scan_providers.dart';
+import '../../state/api_providers.dart';
+import '../../state/plate_providers.dart';
 import '../theme.dart';
 import 'common.dart';
 
@@ -55,7 +56,10 @@ class _ReportSheetState extends ConsumerState<ReportSheet> {
     setState(() => _sent = true);
     // Deliberately not awaited into the UI: a report must never be the thing
     // that shows someone an error.
-    unawaited(ref.read(scanControllerProvider.notifier).report(
+    unawaited(ref.read(deviceProvider.notifier).report(
+          // The plate currently on screen is the thing being reported. Empty
+          // when there is no picture, which the Worker accepts and files.
+          targetId: ref.read(plateVisualProvider).messageId,
           reason: reason,
           note: _note.text.trim(),
         ));

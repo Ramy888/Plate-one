@@ -1,13 +1,12 @@
-import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:plateone/data/prefs_repository.dart';
-import 'package:plateone/data/scan_api.dart';
+import 'package:plateone/data/api.dart';
 import 'package:plateone/state/plate_providers.dart';
 import 'package:plateone/state/providers.dart';
-import 'package:plateone/state/scan_providers.dart';
+import 'package:plateone/state/api_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// A Worker that draws slowly and counts how often it was asked.
@@ -36,7 +35,6 @@ class _SlowApi implements ScanApi {
       imageUrl: null,
       disclaimer: 'test',
       quota: ScanQuota(
-        scans: 0,
         previews: 9,
         voice: 9,
         resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
@@ -49,8 +47,7 @@ class _SlowApi implements ScanApi {
       DeviceRegistration(
         token: 'device-token',
         quota: ScanQuota(
-          scans: 0,
-          previews: 9,
+            previews: 9,
           voice: 9,
           resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
         ),

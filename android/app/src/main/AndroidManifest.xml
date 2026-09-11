@@ -4,21 +4,14 @@
          Without it here, every networked feature fails in release builds. -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
-    <!-- Scanning a meal. Photos are cropped and stripped of metadata on the
-         device before anything is sent, and never stored on our servers. -->
-    <uses-permission android:name="android.permission.CAMERA"/>
-    <!-- A phone without a camera can still use the whole app by hand. -->
-    <uses-feature android:name="android.hardware.camera" android:required="false"/>
-
-    <!-- The camera plugin declares these for video recording and legacy file
-         access. Plate One takes one still photo with audio disabled and
-         writes nothing to shared storage, so they are stripped: asking for a
-         microphone in a nutrition app is a review question we should not have
-         to answer, and READ_EXTERNAL_STORAGE drags the listing into Play's
-         Photo and Video Permissions policy for no benefit. -->
-    <!-- Voice: recorded only while the mic is held, sent to be read, and never
-         kept on the phone or on our server. Stripped again the day voice goes. -->
+    <!-- Speaking is how the app is used. Audio is streamed to be transcribed
+         and is never written to the phone or kept on our server. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+
+    <!-- The audio plugin declares these for legacy file access. Plate One
+         writes nothing to shared storage, and keeping them would drag the
+         listing into Play's Photo and Video Permissions policy for no
+         benefit. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove"/>
 

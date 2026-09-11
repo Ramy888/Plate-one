@@ -5,7 +5,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'mic_source.dart';
 import 'pcm_player.dart';
-import 'scan_api.dart';
+import 'api.dart';
 import 'voice_agent_events.dart';
 
 /// What the conversation is doing, in the only terms worth showing someone.

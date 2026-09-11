@@ -357,16 +357,17 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Privacy policy'), findsWidgets);
 
-      // The policy has to describe what actually happens to a scanned photo, or
-      // it is a false claim shipped with a public demo.
-      expect(find.textContaining('stripped of all metadata'), findsOneWidget);
+      // The policy has to describe what actually happens to what someone says,
+      // or it is a false claim shipped with a public demo.
+      expect(find.textContaining('no recording is kept'), findsOneWidget);
 
       // Every way something leaves the device has to be named, and the policy
-      // must not describe an account the app no longer has.
+      // must not describe a camera the app no longer has or an account it
+      // never had.
       for (final heading in [
         'What is stored on this device',
-        'What happens to a photo you scan',
-        'What happens when you open a result',
+        'What happens to what you say',
+        'What happens to the picture of your plate',
         'The anonymous device id',
       ]) {
         await tester.scrollUntilVisible(find.text(heading), 200);
