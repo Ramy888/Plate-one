@@ -1,5 +1,5 @@
 import { spendGlobal } from './budget';
-import { authenticateDevice, quotaFor, recordEvent } from './device';
+import { authenticateDevice, quotaForDeviceRow, recordEvent } from './device';
 import { ApiError, json } from './http';
 
 /**
@@ -56,7 +56,7 @@ export async function postVoiceToken(request: Request, env: Env): Promise<Respon
   // be debited by a service that was never going to answer.
   await spendGlobal(env, t);
 
-  const stub = quotaFor(env, device.id);
+  const stub = quotaForDeviceRow(env, device);
   const spend = await stub.spend('voice', t);
   if (!spend.ok) {
     throw new ApiError(

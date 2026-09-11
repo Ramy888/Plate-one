@@ -24,6 +24,11 @@ export default defineWorkersConfig({
             // meaningful against a value the test controls.
             ASSEMBLYAI_API_KEY: 'test-assemblyai-key-not-real',
             GEMINI_API_KEY: 'test-gemini-key-not-real',
+            // The audience every test token is minted for. Deliberately not a
+            // real client id: the check that matters is that a token for some
+            // *other* audience is refused, and that is only meaningful against
+            // a value the test controls.
+            GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com',
           },
         },
       },

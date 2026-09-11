@@ -10,8 +10,9 @@
  * it — because this is a public demo URL with a finite budget behind it.
  */
 import { globalCap } from './budget';
+import { verifyGoogleIdToken } from './google_auth';
 import { preflight, withCors } from './cors';
-import { authenticateDevice, forgetDevice, normalizePlatform, quotaFor, registerDevice } from './device';
+import { authenticateDevice, forgetDevice, normalizePlatform, quotaForDeviceRow, registerDevice } from './device';
 import {
   ApiError,
   clientIp,
@@ -21,6 +22,7 @@ import {
   readJson,
   requireString,
 } from './http';
+import { sha256Hex } from './crypto';
 import { postPlate } from './plate';
 import { getPreview } from './preview';
 import { postVoiceToken } from './voice_token';
@@ -70,14 +72,24 @@ async function postDevice(request: Request, env: Env): Promise<Response> {
   const body = await readJson(request);
   const platform = normalizePlatform(body.platform);
 
-  const { token, device } = await registerDevice(env, platform, now());
-  const quota = await quotaFor(env, device.id).peek(now());
+  // Signing in is how a person gets an allowance that follows them between
+  // devices. The subject is hashed before it is stored: the app needs to know
+  // that two devices are the same person and nothing else about them.
+  let accountHash: string | null = null;
+  const idToken = body.idToken;
+  if (typeof idToken === 'string' && idToken !== '') {
+    const { subject } = await verifyGoogleIdToken(env, idToken, now());
+    accountHash = await sha256Hex(`google:${subject}`);
+  }
+
+  const { token, device } = await registerDevice(env, platform, now(), accountHash);
+  const quota = await quotaForDeviceRow(env, device).peek(now());
   return json({ deviceToken: token, quota }, 201);
 }
 
 async function getQuota(request: Request, env: Env): Promise<Response> {
   const device = await authenticateDevice(request, env, now());
-  return json(await quotaFor(env, device.id).peek(now()));
+  return json(await quotaForDeviceRow(env, device).peek(now()));
 }
 
 async function deleteDevice(request: Request, env: Env): Promise<Response> {
@@ -174,6 +186,11 @@ async function handle(request: Request, env: Env, ctx: ExecutionContext): Promis
         budget,
         // Whether voice can work at all, without saying anything about the key.
         voice: env.ASSEMBLYAI_API_KEY ? 'configured' : 'unconfigured',
+        // The client needs to know whether to show a sign-in wall at all, and
+        // the id is public by design — it names the app, it authorises nothing.
+        signIn: env.GOOGLE_CLIENT_ID
+            ? { required: true, clientId: env.GOOGLE_CLIENT_ID }
+            : { required: false },
         models: { vision: env.MODEL_VISION, image: env.MODEL_IMAGE },
       });
     }

@@ -1,6 +1,6 @@
 import { ADDITION_PHRASES } from './additions';
 import { spendGlobal } from './budget';
-import { authenticateDevice, quotaFor, recordEvent } from './device';
+import { authenticateDevice, quotaForDeviceRow, recordEvent } from './device';
 import { FOOD_NAMES } from './foods';
 import { GeminiError, generateJson } from './gemini';
 import { ApiError, json, readJson, requireString } from './http';
@@ -71,7 +71,7 @@ export async function postPlate(request: Request, env: Env): Promise<Response> {
       additionId,
       imageUrl: previewUrlFor(request, cacheKey),
       disclaimer: PREVIEW_DISCLAIMER,
-      quota: (await quotaFor(env, device.id).peek(t)),
+      quota: (await quotaForDeviceRow(env, device).peek(t)),
       cached: true,
     });
   }
@@ -79,7 +79,7 @@ export async function postPlate(request: Request, env: Env): Promise<Response> {
   // The deployment's budget first, then this device's own.
   await spendGlobal(env, t);
 
-  const stub = quotaFor(env, device.id);
+  const stub = quotaForDeviceRow(env, device);
   const spend = await stub.spend('preview', t);
   if (!spend.ok) {
     throw new ApiError(

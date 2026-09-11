@@ -84,6 +84,11 @@
     // Browser origins allowed to call this API. The app's own page must be
     // here or every call fails before it is sent. Comma-separated; the
     // localhost entries are for `flutter run -d chrome` and a local build.
+    // Google sign-in. The *web* OAuth client id, which is public by design —
+    // it identifies the app, it does not authorise anything. Empty turns
+    // sign-in off and /v1/device goes back to anonymous devices.
+    "GOOGLE_CLIENT_ID": "",
+
     "ALLOWED_ORIGINS": "https://plateone.pages.dev,http://localhost:8080,http://localhost:8000"
   }
 
