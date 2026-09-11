@@ -12,6 +12,8 @@ import 'package:plateone/data/voice_agent_session.dart';
 import 'package:plateone/data/catalog.dart';
 import 'package:plateone/data/prefs_repository.dart';
 import 'package:plateone/state/providers.dart';
+import 'package:plateone/data/api.dart';
+import 'package:plateone/state/api_providers.dart';
 import 'package:plateone/state/plate_providers.dart';
 import 'package:plateone/state/voice_conversation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -86,6 +88,7 @@ class FakeSession implements VoiceSession {
 void main() {
   late FakeSession session;
   late MemoryPatchImages savedImages;
+  late _KeepApi keepApi;
 
   // Loaded once. Reading the bundled catalogue on every test is slow and, more
   // to the point, the asset bundle does not enjoy being asked repeatedly.
@@ -103,6 +106,7 @@ void main() {
   }) async {
     session = FakeSession(failOnStart: failOnStart);
     savedImages = MemoryPatchImages();
+    keepApi = _KeepApi();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -115,6 +119,8 @@ void main() {
           plateVisualProvider.overrideWith(_NoDrawing.new),
           // Saving writes the picture to disk. There is no disk here.
           patchImagesProvider.overrideWithValue(savedImages),
+          // Keeping a plate tells the server the try is over.
+          apiProvider.overrideWithValue(keepApi),
         ],
         child: MediaQuery(
           // The skeleton sweep is deliberately endless; a test that settles on
@@ -519,6 +525,40 @@ void main() {
     expect(await savedImages.get(saved.imagePath), isNotEmpty);
   });
 
+  testWidgets('keeping the plate ends the day\'s try', (tester) async {
+    // Trying all three suggestions is free — it is one try either way. This is
+    // the act that spends it.
+    final container = await openHome(tester);
+    await tapMic(tester);
+    container.read(mealDraftProvider.notifier).toggleFood('white_rice');
+    final offered = container.read(agentToolsProvider).recommendNow();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.ensureVisible(find.text(offered.first.addition.name));
+    await tester.pump();
+    await tester.tap(find.text(offered.first.addition.name));
+    await tester.pump();
+
+    expect(keepApi.kept, 0);
+    await tester.tap(find.text('Add this plate to favourite plates'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(keepApi.kept, 1, reason: 'the server was told the try is over');
+  });
+
+  testWidgets('a spent try says so on the plate, with the way past it',
+      (tester) async {
+    // Said on the plate, because the plate is the thing that is not happening.
+    // A message anywhere else leaves someone looking at an empty dish.
+    final container = await openHome(tester);
+    container.read(plateVisualProvider.notifier).state =
+        const PlateVisual(blocked: true);
+    await tester.pump();
+
+    expect(find.textContaining('free plate'), findsOneWidget);
+    expect(find.text('Tap to enter a code'), findsOneWidget);
+  });
+
   testWidgets('the answer time is put in front of whoever is watching',
       (tester) async {
     // The demo's headline number, measured from the first turn rather than
@@ -557,4 +597,30 @@ class _NoDrawing extends PlateVisualController {
 final _onePixelPng = base64Decode(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAE'
   'hQGAhKmMIQAAAABJRU5ErkJggg==',
+);
+
+/// A Worker that only answers the two calls this screen makes.
+class _KeepApi implements PlateApi {
+  int kept = 0;
+
+  @override
+  Future<DeviceRegistration> registerDevice({required String platform}) async =>
+      DeviceRegistration(token: 'device-token', quota: _allowance);
+
+  @override
+  Future<Allowance> keepPlate(String deviceToken) async {
+    kept++;
+    return _allowance;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName} is not part of this test');
+}
+
+final _allowance = Allowance(
+  plates: 1,
+  previews: 9,
+  voice: 9,
+  resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
 );

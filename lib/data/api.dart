@@ -88,6 +88,43 @@ class PlateApi {
     return VoiceToken.fromJson(_decode(response));
   }
 
+  /// Ends the day's free try.
+  ///
+  /// Keeping a plate is the last thing somebody does with one, so it is what
+  /// spends the try. The plate itself never leaves the device — this counts,
+  /// and only counts.
+  Future<Allowance> keepPlate(String deviceToken) async {
+    final response = await _send(
+      () => _client.post(_uri('/v1/plate/keep'), headers: _auth(deviceToken)),
+      timeout: const Duration(seconds: 20),
+    );
+    return Allowance.fromJson(
+      (_decode(response)['quota'] as Map<String, dynamic>?) ?? const {},
+    );
+  }
+
+  /// Redeems a promo code for more tries.
+  Future<PromoResult> redeemPromo({
+    required String deviceToken,
+    required String code,
+  }) async {
+    final response = await _send(
+      () => _client.post(
+        _uri('/v1/promo'),
+        headers: {..._auth(deviceToken), 'content-type': 'application/json'},
+        body: jsonEncode({'code': code}),
+      ),
+      timeout: const Duration(seconds: 20),
+    );
+    final body = _decode(response);
+    return PromoResult(
+      granted: (body['granted'] as num?)?.toInt() ?? 0,
+      quota: Allowance.fromJson(
+        (body['quota'] as Map<String, dynamic>?) ?? const {},
+      ),
+    );
+  }
+
   /// Downloads a generated preview. Kept on the device only.
   Future<Uint8List> previewImage({
     required String deviceToken,
@@ -180,12 +217,20 @@ enum ApiError {
   unauthorized,
   pictureExpired,
 
+  /// Today's free plate is used. Not a failure — a door with a key beside it.
+  tryUsed,
+
+  /// A promo code that is wrong, or already spent.
+  promoRefused,
+
   /// Something the Worker refused to accept. Always a bug on our side: the
   /// client only ever sends catalogue ids.
   rejected,
   unknown;
 
   static ApiError fromCode(String code, int status) => switch (code) {
+        'try_used' => ApiError.tryUsed,
+        'promo_unknown' || 'promo_used' || 'promo_spent' => ApiError.promoRefused,
         'quota_exhausted' => ApiError.quotaExhausted,
         'preview_expired' => ApiError.pictureExpired,
         'plate_unavailable' || 'plate_blocked' => ApiError.busy,
@@ -224,34 +269,58 @@ class DeviceRegistration {
 
 class Allowance {
   const Allowance({
+    required this.plates,
     required this.previews,
     required this.voice,
     required this.resetsAt,
+    this.bonus = false,
   });
 
-  /// What is left today, not what has been spent.
+  /// Free tries left. A try is the whole journey — talk, be recommended
+  /// something, watch it drawn — and keeping the plate is what spends it.
+  final int plates;
+
+  /// Pictures. Several go into one try, as the meal fills in and suggestions
+  /// are tried, so this is never the number a person thinks about.
   final int previews;
 
-  /// Conversations. The most generous of the three, because it is the product.
+  /// Conversations. Talking is free to us, so this is generous and is really
+  /// only here to stop a runaway.
   final int voice;
   final DateTime resetsAt;
 
+  /// Whether any of this came from a redeemed code.
+  final bool bonus;
+
   /// Before the device has ever registered.
   static final unknown = Allowance(
+    plates: 0,
     previews: 0,
     voice: 0,
     resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
   );
 
+  bool get hasTry => plates > 0;
   bool get hasVoice => voice > 0;
 
   factory Allowance.fromJson(Map<String, dynamic> json) => Allowance(
+        plates: (json['plates'] as num?)?.toInt() ?? 0,
         previews: (json['previews'] as num?)?.toInt() ?? 0,
         voice: (json['voice'] as num?)?.toInt() ?? 0,
+        bonus: json['bonus'] == true,
         resetsAt: DateTime.fromMillisecondsSinceEpoch(
           ((json['resetsAt'] as num?)?.toInt() ?? 0) * 1000,
         ),
       );
+}
+
+/// What a redeemed code was worth.
+class PromoResult {
+  const PromoResult({required this.granted, required this.quota});
+
+  /// How many more tries it opened.
+  final int granted;
+  final Allowance quota;
 }
 
 /// Permission to hold one conversation.

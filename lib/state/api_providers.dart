@@ -70,6 +70,29 @@ class DeviceController extends Notifier<DeviceState> {
   /// app shows stays honest after a conversation or a picture spends one.
   void noteQuota(Allowance quota) => state = state.copyWith(quota: quota);
 
+  /// Ends the day's free try.
+  ///
+  /// Keeping a plate is what spends it. Returns false when there was nothing
+  /// left to spend — the caller shows the way back in rather than an error,
+  /// because a spent try is not a failure.
+  Future<bool> keepPlate() async {
+    try {
+      state = state.copyWith(quota: await _api.keepPlate(await token()));
+      return true;
+    } on ApiFailure {
+      await refreshQuota();
+      return false;
+    }
+  }
+
+  /// Redeems a promo code. Throws so the sheet can say which kind of no it
+  /// was: a code nobody issued reads differently from one already used.
+  Future<PromoResult> redeem(String code) async {
+    final result = await _api.redeemPromo(deviceToken: await token(), code: code);
+    state = state.copyWith(quota: result.quota);
+    return result;
+  }
+
   /// Reads the allowance without spending any. Failures are swallowed: not
   /// knowing the quota is not worth an error in front of someone.
   Future<void> refreshQuota() async {

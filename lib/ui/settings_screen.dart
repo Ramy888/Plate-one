@@ -152,11 +152,13 @@ class _VoiceAllowanceState extends ConsumerState<_VoiceAllowance> {
   }
 
   static String _describe(Allowance? quota) {
-    if (quota == null) return 'Start a conversation to see how many you have left.';
-    if (!quota.hasVoice) {
-      return 'None left today. Picking the food by hand is unlimited, and always will be.';
+    if (quota == null) return 'Loading…';
+    if (!quota.hasTry) {
+      return 'Used. A promo code opens another, and building a meal by hand is '
+          'unlimited — today and always.';
     }
-    return '${quota.voice} left today';
+    final plural = quota.plates == 1 ? 'plate' : 'plates';
+    return '${quota.plates} $plural left today${quota.bonus ? ' (a code opened these)' : ''}';
   }
 
   @override
@@ -172,7 +174,7 @@ class _VoiceAllowanceState extends ConsumerState<_VoiceAllowance> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Conversations today', style: Theme.of(context).textTheme.titleMedium),
+                Text('Free plates today', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 2),
                 Text(_describe(quota), style: Theme.of(context).textTheme.bodyMedium),
               ],

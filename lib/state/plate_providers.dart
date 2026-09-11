@@ -20,6 +20,7 @@ class PlateVisual {
     this.image,
     this.loading = false,
     this.unavailable = false,
+    this.blocked = false,
   });
 
   /// What a rating or a report is filed against. Empty until one arrives.
@@ -33,6 +34,11 @@ class PlateVisual {
 
   /// The picture could not be drawn. Not an error worth a dialog.
   final bool unavailable;
+
+  /// Today's free try is used, so there is nothing to draw with. Kept apart
+  /// from [unavailable] because it is not a failure: it has a way out, and the
+  /// plate says what it is.
+  final bool blocked;
 
   /// The allowance is spent, which is a reason to sell rather than apologise.
 }
@@ -141,9 +147,13 @@ class PlateVisualController extends Notifier<PlateVisual> {
         unavailable: image == null,
       );
       ref.read(deviceProvider.notifier).noteQuota(reply.quota);
-    } on ApiFailure {
+    } on ApiFailure catch (failure) {
       if (_stale(key)) return;
-      state = const PlateVisual(unavailable: true);
+      // A spent try is not a failed drawing. The screen says so differently,
+      // and offers the way back in rather than an apology.
+      state = failure.error == ApiError.tryUsed
+          ? const PlateVisual(blocked: true)
+          : const PlateVisual(unavailable: true);
     } catch (_) {
       if (_stale(key)) return;
       state = const PlateVisual(unavailable: true);

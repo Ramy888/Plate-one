@@ -160,6 +160,7 @@ VoiceToken _token({int maxSessionSeconds = 600, String token = 'tok_live'}) => V
       expiresAt: DateTime.fromMillisecondsSinceEpoch(1789310995000),
       maxSessionSeconds: maxSessionSeconds,
       quota: Allowance(
+        plates: 1,
         previews: 4,
         voice: 11,
         resetsAt: DateTime.fromMillisecondsSinceEpoch(1789310995000),

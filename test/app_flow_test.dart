@@ -44,6 +44,7 @@ class _QuotaApi implements PlateApi {
   Future<Allowance> quota(String deviceToken) async {
     asked++;
     return Allowance(
+      plates: 2,
       previews: 27,
       voice: 9,
       resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
@@ -429,8 +430,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(api.asked, 1);
-      expect(find.text('9 left today'), findsOneWidget);
-      expect(find.textContaining('Start a conversation'), findsNothing);
+      expect(find.text('2 plates left today'), findsOneWidget);
+      expect(find.text('Loading…'), findsNothing);
     });
 
     testWidgets('a goal chosen at onboarding can be changed later',

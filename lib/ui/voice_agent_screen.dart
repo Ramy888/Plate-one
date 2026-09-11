@@ -15,6 +15,7 @@ import 'settings_screen.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
 import 'widgets/mic_button.dart';
+import 'widgets/promo_sheet.dart';
 import 'widgets/transitions.dart';
 
 /// The whole app, on one screen.
@@ -367,6 +368,10 @@ class _Plate extends ConsumerWidget {
                     ),
                   ),
                 if (visual.loading) const _PlateSkeleton(),
+                // Said on the plate, because the plate is the thing that is not
+                // happening. A message somewhere else leaves someone looking at
+                // an empty dish wondering what they did wrong.
+                if (visual.blocked) const _PlateBlocked(),
                 // The shadow the rim casts down into the well. Always last, so
                 // it falls across the food as well as the porcelain.
                 IgnorePointer(
@@ -388,6 +393,61 @@ class _Plate extends ConsumerWidget {
                 ),
               ],
             ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Why the plate is staying empty.
+///
+/// Not an error: the conversation is still going and still free. This is a
+/// door with a key beside it, and it says where the key is.
+///
+/// The whole circle is the control. A button inside it does not fit — the
+/// plate is as small as 110 points on a short phone — and a plate you can tap
+/// is a bigger target than any button that would.
+class _PlateBlocked extends StatelessWidget {
+  const _PlateBlocked();
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipOval(
+      child: Material(
+        color: PlateColors.neutral100.withValues(alpha: 0.93),
+        child: InkWell(
+          onTap: () => PromoSheet.show(context),
+          child: Padding(
+            padding: const EdgeInsets.all(Space.lg),
+            child: Center(
+              // Scaled rather than wrapped: the plate is a circle, and text
+              // reflowing inside one looks like a mistake.
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(LucideIcons.ticket, size: 26, color: PlateColors.warn),
+                    const SizedBox(height: Space.sm),
+                    Text(
+                      'Today’s free plate\nis used',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: Space.xs),
+                    Text(
+                      'Tap to enter a code',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: PlateColors.green),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -894,12 +954,24 @@ class _Failure extends ConsumerWidget {
           children: [
             Text(message, style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: Space.sm),
-            TextButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                slideUpRoute(FoodPickerScreen(slot: ref.read(mealDraftProvider).slot)),
-              ),
-              icon: const Icon(LucideIcons.hand, size: 18),
-              label: const Text('Build it by hand'),
+            // Two ways on, side by side. One of them costs nothing and always
+            // works, which is why it is not going anywhere.
+            Wrap(
+              spacing: Space.sm,
+              children: [
+                TextButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    slideUpRoute(FoodPickerScreen(slot: ref.read(mealDraftProvider).slot)),
+                  ),
+                  icon: const Icon(LucideIcons.hand, size: 18),
+                  label: const Text('Build it by hand'),
+                ),
+                TextButton.icon(
+                  onPressed: () => PromoSheet.show(context),
+                  icon: const Icon(LucideIcons.ticket, size: 18),
+                  label: const Text('Have a promo code?'),
+                ),
+              ],
             ),
           ],
         ),

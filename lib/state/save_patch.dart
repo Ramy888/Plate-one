@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/models.dart';
 import '../ui/check_screen.dart';
+import 'api_providers.dart';
 import 'providers.dart';
 
 /// Saving a patch, from wherever it was suggested.
@@ -24,6 +25,12 @@ Future<void> savePatch(
   bool returnToStart = true,
   bool askHowItWent = true,
 }) async {
+  // Keeping the plate is what ends the day's free try, so the server is told
+  // first. If there was nothing left to spend the plate is still kept — the
+  // history is the user's, and refusing to save it would be punishing them for
+  // a counter. The caller decides what to say about it.
+  await ref.read(deviceProvider.notifier).keepPlate();
+
   final id = DateTime.now().microsecondsSinceEpoch.toString();
 
   // The picture is kept with the patch, not with the session. A saved meal is

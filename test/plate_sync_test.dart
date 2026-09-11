@@ -27,6 +27,7 @@ class _SlowApi implements PlateApi {
   }) async {
     drawn.add('${foodIds.join(',')}|$additionId');
     await Future<void>.delayed(delay);
+    if (refuseWith case final error?) throw ApiFailure(error, 'refused');
     return ChatReply(
       messageId: 'm${drawn.length}',
       reply: '',
@@ -35,6 +36,7 @@ class _SlowApi implements PlateApi {
       imageUrl: null,
       disclaimer: 'test',
       quota: Allowance(
+        plates: 1,
         previews: 9,
         voice: 9,
         resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
@@ -47,16 +49,48 @@ class _SlowApi implements PlateApi {
       DeviceRegistration(
         token: 'device-token',
         quota: Allowance(
+            plates: 1,
             previews: 9,
           voice: 9,
           resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
         ),
       );
 
+  /// Set to refuse the next draw the way a spent try does.
+  ApiError? refuseWith;
+
+  int kept = 0;
+  final redeemed = <String>[];
+
+  @override
+  Future<Allowance> keepPlate(String deviceToken) async {
+    kept++;
+    return _allowance(plates: 0);
+  }
+
+  @override
+  Future<PromoResult> redeemPromo({
+    required String deviceToken,
+    required String code,
+  }) async {
+    redeemed.add(code);
+    if (code != 'PLATE-GOOD1') {
+      throw const ApiFailure(ApiError.promoRefused, 'That code is not one we know.');
+    }
+    return PromoResult(granted: 5, quota: _allowance(plates: 5));
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) =>
       throw UnimplementedError('${invocation.memberName} is not part of this test');
 }
+
+Allowance _allowance({int plates = 1}) => Allowance(
+      plates: plates,
+      previews: 9,
+      voice: 9,
+      resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
+    );
 
 Future<ProviderContainer> _container(_SlowApi api) async {
   SharedPreferences.setMockInitialValues({});
@@ -157,5 +191,30 @@ void main() {
 
     expect(container.read(plateVisualProvider).loading, isTrue);
     expect(container.read(plateVisualProvider).image, isNotNull);
+  });
+  test('a spent try is shown as a door, not as a broken drawing', () async {
+    // "Could not be drawn" reads as the app being broken. "Today's plate is
+    // used" reads as a rule, and has a way past it.
+    final api = _SlowApi()..refuseWith = ApiError.tryUsed;
+    final container = await _container(api);
+    final plate = container.read(plateVisualProvider.notifier);
+
+    plate.request(foodIds: ['white_rice'], now: true);
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+
+    expect(container.read(plateVisualProvider).blocked, isTrue);
+    expect(container.read(plateVisualProvider).unavailable, isFalse);
+  });
+
+  test('any other refusal is still just a missing picture', () async {
+    final api = _SlowApi()..refuseWith = ApiError.busy;
+    final container = await _container(api);
+    final plate = container.read(plateVisualProvider.notifier);
+
+    plate.request(foodIds: ['white_rice'], now: true);
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+
+    expect(container.read(plateVisualProvider).blocked, isFalse);
+    expect(container.read(plateVisualProvider).unavailable, isTrue);
   });
 }
