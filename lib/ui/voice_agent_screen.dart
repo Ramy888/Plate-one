@@ -285,37 +285,111 @@ class _Plate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final visual = ref.watch(plateVisualProvider);
 
+    // A plate seen from above, lit from the upper left. Four layers, which is
+    // what it takes for a circle to read as a dish rather than as a circle:
+    // the shadow it casts, the rim, the well the food sits in, and the sheen.
+    final rim = size * 0.085;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Space.sm),
       child: SizedBox(
         height: size,
         width: size,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // The plate itself, always drawn, so there is something to look at
-            // before there is anything to show.
-            Container(
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: PlateColors.neutral100,
-                border: Border.fromBorderSide(
-                  BorderSide(color: PlateColors.line, width: 8),
-                ),
-              ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            // The rim catches the light on one side and turns away from it on
+            // the other. A flat fill here is what made it look printed on.
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFFFFDF8), PlateColors.neutral300],
+              stops: [0.15, 1.0],
             ),
-            if (visual.image case final bytes?)
-              ClipOval(child: Image.memory(bytes, fit: BoxFit.cover))
-            else if (!visual.loading)
-              const Center(
-                child: Icon(
-                  LucideIcons.utensils,
-                  size: 44,
-                  color: PlateColors.neutral400,
+            boxShadow: [
+              // Contact: tight and close, where the plate meets the table.
+              BoxShadow(
+                color: PlateColors.ink.withValues(alpha: 0.16),
+                blurRadius: size * 0.06,
+                offset: Offset(0, size * 0.02),
+              ),
+              // Cast: wide and soft, which is what gives the height. Kept
+              // tight enough that the plate sits on the table rather than
+              // floating over it like a ball.
+              BoxShadow(
+                color: PlateColors.ink.withValues(alpha: 0.09),
+                blurRadius: size * 0.13,
+                offset: Offset(0, size * 0.06),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(rim),
+            // The step down from rim to well. Without a hard edge here the two
+            // gradients blend and the whole thing goes soft again.
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: PlateColors.ink.withValues(alpha: 0.07),
+                  width: 1.2,
                 ),
               ),
-            if (visual.loading) const _PlateSkeleton(),
-          ],
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // The well is lit from the *opposite* side to the rim, and
+                // that inversion is the whole trick: on a dish the near wall
+                // turns away from the light and the far wall catches it, so a
+                // rim bright at the top-left over a well bright at the
+                // bottom-right reads as hollow. Matching them reads as a dome.
+                DecoratedBox(
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      center: Alignment(0.45, 0.55),
+                      radius: 1.1,
+                      colors: [Color(0xFFFFFDF8), PlateColors.neutral300],
+                      stops: [0.0, 1.0],
+                    ),
+                  ),
+                ),
+                // What the food sits in, not on: inset by the rim, so the rim
+                // stays a rim even when the plate is full.
+                if (visual.image case final bytes?)
+                  ClipOval(child: Image.memory(bytes, fit: BoxFit.cover))
+                else if (!visual.loading)
+                  Center(
+                    child: Icon(
+                      LucideIcons.utensils,
+                      size: size * 0.17,
+                      color: PlateColors.neutral400,
+                    ),
+                  ),
+                if (visual.loading) const _PlateSkeleton(),
+                // The shadow the rim casts down into the well. Always last, so
+                // it falls across the food as well as the porcelain.
+                IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          PlateColors.ink.withValues(alpha: 0.20),
+                          PlateColors.ink.withValues(alpha: 0.04),
+                          const Color(0x00000000),
+                        ],
+                        stops: const [0.0, 0.30, 0.62],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            ),
+          ),
         ),
       ),
     );
