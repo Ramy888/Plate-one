@@ -209,8 +209,15 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
   StreamSubscription<VoiceEvent>? _events;
   StreamSubscription<VoiceAgentState>? _states;
 
-  /// When the user stopped talking, so the first sound of the answer can be
-  /// measured against it.
+  /// The last moment the user was heard saying anything, so the first sound of
+  /// the answer can be measured against it.
+  ///
+  /// Not `input.speech.stopped`: the server sends that only once it has
+  /// already transcribed the sentence and decided to reply, so measuring from
+  /// it reports single-digit milliseconds — which is what this used to do, and
+  /// it was nonsense. The last partial transcript lands about 120 ms after
+  /// someone actually stops speaking, which is the closest honest anchor a
+  /// client has. It therefore reads a little under the true figure.
   DateTime? _askedAt;
 
   /// The reply currently being spoken, so only its first audio chunk counts.
@@ -323,13 +330,15 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
       case UserTranscriptDelta():
         // Each delta is the whole transcript so far, not the next word. It
         // replaces its predecessor — concatenating renders "rice rice and".
+        _askedAt = DateTime.now();
         _write(fromUser: true, text: event.text);
 
       case UserTranscript():
+        _askedAt ??= DateTime.now();
         _write(fromUser: true, text: event.text, settled: true);
 
       case SpeechStopped():
-        _askedAt = DateTime.now();
+        break;
 
       case ReplyStarted():
         _timedReply = event.replyId;

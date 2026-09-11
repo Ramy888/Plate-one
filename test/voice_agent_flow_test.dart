@@ -526,7 +526,11 @@ void main() {
     await openHome(tester);
     await tapMic(tester);
 
-    session.says(const SpeechStopped());
+    // Anchored on the last word heard, not on input.speech.stopped — the
+    // server sends that only after it has already decided to reply, so
+    // measuring from it reported single-digit milliseconds.
+    session.says(const UserTranscriptDelta('rice and chicken'));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 120));
     session.says(const ReplyStarted('r1'));
     session.says(ReplyAudio(replyId: 'r1', pcm16: Uint8List.fromList([1, 2])));
