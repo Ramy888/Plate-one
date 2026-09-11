@@ -634,3 +634,53 @@ class Readable extends StatelessWidget {
     );
   }
 }
+
+/// One part of a page, inside its own border.
+///
+/// The result page was a single column of text and pictures with blank space
+/// between the parts — and blank space is not a boundary, so "what is on your
+/// plate", "what to add" and "why" all read as one long paragraph. A hairline
+/// says where each one stops.
+class Section extends StatelessWidget {
+  const Section({
+    super.key,
+    required this.child,
+    this.title,
+    this.padding = const EdgeInsets.all(Space.md),
+  });
+
+  final Widget child;
+
+  /// A quiet label above the content. Omitted where the content names itself.
+  final String? title;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: PlateColors.neutral100,
+        borderRadius: BorderRadius.circular(kRadiusSmall),
+        border: Border.all(color: PlateColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (title case final title?) ...[
+            Text(
+              title.toUpperCase(),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: PlateColors.inkSoft,
+                    letterSpacing: 0.8,
+                  ),
+            ),
+            const SizedBox(height: Space.sm),
+          ],
+          child,
+        ],
+      ),
+    );
+  }
+}

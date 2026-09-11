@@ -61,10 +61,11 @@ Future<ProviderContainer> _pumpApp(
   Map<String, Object> prefs = const {},
   Widget home = const _Root(),
   PlateApi? api,
-}) async {
   // A tall viewport so a full food grid and three suggestion cards fit without
   // scrolling. The default 800x600 test window is nothing like a phone.
-  tester.view.physicalSize = const Size(1200, 3000);
+  Size size = const Size(1200, 3000),
+}) async {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 2.0;
   addTearDown(tester.view.reset);
 
@@ -257,6 +258,40 @@ void main() {
     expect(find.textContaining('Patch this meal'), findsOneWidget);
   });
 
+  testWidgets('the food picker is readable in a wide window', (tester) async {
+    // It was the one screen the responsive pass missed, and a rail of tiles
+    // dragged sideways across two thousand pixels is not a way to choose.
+    await _pumpApp(
+      tester,
+      prefs: {'onboarded': true},
+      size: const Size(3200, 1800),
+    );
+    await _openFoodPicker(tester);
+
+    final list = tester.getSize(find.byType(ListView).first);
+    expect(list.width, lessThanOrEqualTo(720));
+  });
+
+  testWidgets('an open rail lays its foods out when there is room',
+      (tester) async {
+    await _pumpApp(
+      tester,
+      prefs: {'onboarded': true},
+      size: const Size(3200, 1800),
+    );
+    // Opens the rail Rice lives in, the same way a finger would.
+    await _tapFood(tester, 'Rice');
+
+    expect(find.byType(FoodTile), findsWidgets);
+    // Wrapped, not queued: no horizontal scroller inside the open rail.
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is Scrollable && w.axisDirection == AxisDirection.right,
+      ),
+      findsNothing,
+    );
+  });
+
   testWidgets('a plate of rice leads with one patch and offers the other two',
       (tester) async {
     await _pumpApp(tester, prefs: {'onboarded': true});
@@ -281,7 +316,8 @@ void main() {
     expect(find.text("I'll add this"), findsOneWidget);
 
     // The engine found three angles, so two are offered as alternatives.
-    expect(find.text('Or instead'), findsOneWidget);
+    // The section labels are set in caps by the widget, not by the copy.
+    expect(find.text('OR INSTEAD'), findsOneWidget);
     expect(find.byType(PatchHighlight), findsOneWidget);
   });
 

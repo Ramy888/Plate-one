@@ -15,7 +15,7 @@ import 'settings_screen.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
 import 'widgets/mic_button.dart';
-import 'widgets/promo_sheet.dart';
+import 'widgets/promo_dialog.dart';
 import 'widgets/toast.dart';
 import 'widgets/transitions.dart';
 
@@ -442,7 +442,7 @@ class _PlateBlocked extends StatelessWidget {
       child: Material(
         color: PlateColors.neutral100.withValues(alpha: 0.93),
         child: InkWell(
-          onTap: () => PromoSheet.show(context),
+          onTap: () => PromoDialog.show(context),
           child: Padding(
             padding: const EdgeInsets.all(Space.lg),
             child: Center(
@@ -993,7 +993,7 @@ class _Failure extends ConsumerWidget {
                   label: const Text('Build it by hand'),
                 ),
                 TextButton.icon(
-                  onPressed: () => PromoSheet.show(context),
+                  onPressed: () => PromoDialog.show(context),
                   icon: const Icon(LucideIcons.ticket, size: 18),
                   label: const Text('Have a promo code?'),
                 ),

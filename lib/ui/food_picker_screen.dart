@@ -61,7 +61,8 @@ class _FoodPickerScreenState extends ConsumerState<FoodPickerScreen> {
         child: Column(
           children: [
             Expanded(
-              child: ListView(
+              child: Readable(
+                child: ListView(
                 padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.lg),
                 children: [
                   Text(
@@ -84,6 +85,7 @@ class _FoodPickerScreenState extends ConsumerState<FoodPickerScreen> {
                     const SizedBox(height: Space.sm),
                   ],
                 ],
+                ),
               ),
             ),
             _PatchBar(
@@ -178,25 +180,43 @@ class _Rail extends StatelessWidget {
         if (open)
           Padding(
             padding: const EdgeInsets.only(top: Space.sm),
-            child: SizedBox(
-              height: 130,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                // The rail bleeds to the screen edge, so a half-visible tile
-                // says "there is more" without a scrollbar saying it.
-                padding: const EdgeInsets.symmetric(horizontal: Space.xs),
-                itemCount: rail.foods.length,
-                separatorBuilder: (_, _) => const SizedBox(width: Space.sm),
-                itemBuilder: (_, i) {
-                  final food = rail.foods[i];
-                  return FoodTile(
-                    icon: catalogIcon(food.icon),
-                    label: food.name,
-                    selected: selectedIds.contains(food.id),
-                    onTap: () => onTapFood(food),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final tiles = [
+                  for (final food in rail.foods)
+                    FoodTile(
+                      icon: catalogIcon(food.icon),
+                      label: food.name,
+                      selected: selectedIds.contains(food.id),
+                      onTap: () => onTapFood(food),
+                    ),
+                ];
+
+                // Given room, lay the foods out where they can all be seen. A
+                // horizontal rail on a wide window is a long thin queue that
+                // has to be dragged through — the scrolling was a concession
+                // to a phone's width, not a way anyone wants to choose.
+                if (constraints.maxWidth >= 520) {
+                  return Wrap(
+                    spacing: Space.sm,
+                    runSpacing: Space.sm,
+                    children: tiles,
                   );
-                },
-              ),
+                }
+
+                return SizedBox(
+                  height: 130,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    // The rail bleeds to the screen edge, so a half-visible
+                    // tile says "there is more" without a scrollbar saying it.
+                    padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+                    itemCount: tiles.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: Space.sm),
+                    itemBuilder: (_, i) => tiles[i],
+                  ),
+                );
+              },
             ),
           ),
       ],

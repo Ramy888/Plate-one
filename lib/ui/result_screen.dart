@@ -82,25 +82,48 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
           child: ListView(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.xl),
           children: [
-            _OnYourPlate(foods: result.foods),
+            // Each part of the answer inside its own border. Blank space is
+            // not a boundary: without these, the plate, the suggestion and the
+            // reasoning read as one long paragraph.
+            Section(
+              title: 'On your plate',
+              child: _OnYourPlate(foods: result.foods),
+            ),
             const SizedBox(height: Space.md),
-            Text(result.headline, style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: Space.lg),
 
             if (result.isBalanced)
-              const _Balanced()
+              const Section(child: _Balanced())
             else if (patch == null)
-              const _NoSuggestions()
+              const Section(child: _NoSuggestions())
             else ...[
-              _Hero(patch: patch, visual: visual, onDraw: _draw),
-              const SizedBox(height: Space.md),
-              PatchHighlight(
-                icon: catalogIcon(patch.addition.icon),
-                name: patch.addition.name,
-                how: patch.addition.how,
+              Section(
+                title: 'What may be missing',
+                child: Text(
+                  result.headline,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
               ),
               const SizedBox(height: Space.md),
-              _Why(result: result, patch: patch, caption: visual.caption),
+              Section(
+                title: 'Add this',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _Hero(patch: patch, visual: visual, onDraw: _draw),
+                    const SizedBox(height: Space.md),
+                    PatchHighlight(
+                      icon: catalogIcon(patch.addition.icon),
+                      name: patch.addition.name,
+                      how: patch.addition.how,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: Space.md),
+              Section(
+                title: 'Why',
+                child: _Why(result: result, patch: patch, caption: visual.caption),
+              ),
               const SizedBox(height: Space.lg),
               FilledButton(
                 onPressed: () => savePatch(
@@ -115,19 +138,25 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                 child: const Text("I'll add this"),
               ),
               if (result.patches.length > 1) ...[
-                const SizedBox(height: Space.xl),
-                Text('Or instead', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: Space.sm),
-                for (final other in result.patches.where((p) => p.angle != patch.angle)) ...[
-                  _Alternative(
-                    patch: other,
-                    onTap: () {
-                      setState(() => _chosen = other.angle);
-                      _draw();
-                    },
+                const SizedBox(height: Space.lg),
+                Section(
+                  title: 'Or instead',
+                  child: Column(
+                    children: [
+                      for (final other
+                          in result.patches.where((p) => p.angle != patch.angle)) ...[
+                        _Alternative(
+                          patch: other,
+                          onTap: () {
+                            setState(() => _chosen = other.angle);
+                            _draw();
+                          },
+                        ),
+                        const SizedBox(height: Space.sm),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: Space.sm),
-                ],
+                ),
               ],
             ],
           ],
@@ -149,8 +178,6 @@ class _OnYourPlate extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('On your plate', style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: Space.sm),
         Wrap(
           spacing: Space.sm,
           runSpacing: Space.sm,
