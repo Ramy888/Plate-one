@@ -293,9 +293,10 @@ void main() {
     // listen to twice.
     final container = await openHome(tester);
 
-    final options = container.read(agentToolsProvider);
     container.read(mealDraftProvider.notifier).toggleFood('white_rice');
-    container.read(voiceConversationProvider.notifier).offer(options.recommendNow());
+    // Running the engine puts the row in the conversation by itself — that is
+    // the same callback the agent's own tool call goes through.
+    container.read(agentToolsProvider).recommendNow();
     await tester.pump();
 
     expect(find.text('Tap one to see it on your plate'), findsOneWidget);
@@ -309,10 +310,12 @@ void main() {
 
     container.read(mealDraftProvider.notifier).toggleFood('white_rice');
     final offered = container.read(agentToolsProvider).recommendNow();
-    container.read(voiceConversationProvider.notifier).offer(offered);
     await tester.pump();
 
     expect(container.read(chosenPatchProvider), isNull);
+    // The thread scrolls itself; find the card where it ended up.
+    await tester.ensureVisible(find.text(offered.first.addition.name));
+    await tester.pump();
     await tester.tap(find.text(offered.first.addition.name));
     await tester.pump();
 
@@ -320,24 +323,87 @@ void main() {
     expect(find.text('Keep this'), findsOneWidget);
   });
 
-  testWidgets('every settled reply offers the answer without waiting for it',
+  testWidgets('a settled reply points at the cards rather than duplicating them',
       (tester) async {
-    // "Add patch now" — for someone who does not want to talk their way to the
-    // question.
+    // It used to be a second button that ran the engine. Two controls doing
+    // the same job only makes someone wonder which is the real one.
     final container = await openHome(tester);
     container.read(mealDraftProvider.notifier).toggleFood('white_rice');
-    // Nothing listens to the session until the conversation has been started.
     await tapMic(tester);
 
     session.says(const ReplyStarted('r1'));
     session.says(const AgentTranscript(text: 'Anything green?', interrupted: false));
     await tester.pump();
 
-    expect(find.text('Add patch now'), findsOneWidget);
-    await tester.tap(find.text('Add patch now'));
+    expect(find.text('Select from patches below'), findsOneWidget);
+    expect(find.text('Add patch now'), findsNothing);
+  });
+
+  testWidgets('a fourth card reveals one more, without a second round trip',
+      (tester) async {
+    final container = await openHome(tester);
+    container.read(mealDraftProvider.notifier).toggleFood('white_rice');
+    final offered = container.read(agentToolsProvider).recommendNow();
     await tester.pump();
 
-    expect(find.text('Tap one to see it on your plate'), findsOneWidget);
+    expect(offered.length, greaterThan(3), reason: 'the engine has more to give');
+    final shownAtFirst = container.read(voiceConversationProvider).turns.last.shown;
+    expect(shownAtFirst, 3);
+
+    // The row scrolls; the fourth card starts off the right-hand edge.
+    await tester.ensureVisible(find.text('Show more recommendations'));
+    await tester.pump();
+    await tester.tap(find.text('Show more recommendations'));
+    await tester.pump();
+
+    expect(container.read(voiceConversationProvider).turns.last.shown, 4);
+    expect(find.text(offered[3].addition.name), findsOneWidget);
+  });
+
+  testWidgets('the newest line is the one on screen', (tester) async {
+    // A transcript that does not follow itself is a transcript nobody reads:
+    // the newest line is the one being spoken.
+    await openHome(tester);
+    await tapMic(tester);
+
+    for (var i = 0; i < 25; i++) {
+      session.says(const SpeechStarted());
+      session.says(UserTranscript('line number $i on the plate'));
+      session.says(const ReplyStarted('r'));
+      session.says(AgentTranscript(text: 'reply number $i', interrupted: false));
+    }
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('reply number 24'), findsOneWidget);
+    expect(find.text('line number 0 on the plate'), findsNothing,
+        reason: 'the top of a long thread is scrolled away, not still showing');
+  });
+
+  testWidgets('a wide window puts the plate beside the conversation',
+      (tester) async {
+    // A chat stretched across sixteen hundred pixels is a chat nobody can read
+    // a line of.
+    tester.view.physicalSize = const Size(2400, 1400);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.reset);
+
+    final container = await openHome(tester);
+    container.read(mealDraftProvider.notifier).toggleFood('white_rice');
+    final offered = container.read(agentToolsProvider).recommendNow();
+    await tester.pump();
+
+    await tester.ensureVisible(find.text(offered.first.addition.name));
+    await tester.pump();
+    await tester.tap(find.text(offered.first.addition.name));
+    await tester.pump();
+
+    // The plate column and the thread are side by side, and what was chosen
+    // sits under the plate rather than at the end of the conversation.
+    expect(find.byType(Row), findsWidgets);
+    expect(find.text('Keep this'), findsOneWidget);
+    final plate = tester.getCenter(find.byType(MicButton));
+    expect(plate.dx, greaterThan(600), reason: 'the mic is in the right-hand column');
   });
 
   testWidgets('the plate is empty before anything is described', (tester) async {

@@ -34,7 +34,7 @@ class VoiceAgentScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final voice = ref.watch(voiceConversationProvider);
-    final conversation = ref.read(voiceConversationProvider.notifier);
+    final conversation0 = ref.read(voiceConversationProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
@@ -63,29 +63,63 @@ class VoiceAgentScreen extends ConsumerWidget {
         top: false,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // The plate takes a share of what is there rather than a fixed
-            // size. At 260 on a short screen it pushes the microphone off the
-            // bottom — and the microphone is the only control this app has.
-            final plate = (constraints.maxHeight * 0.34).clamp(110.0, 260.0);
-            return Column(
-          children: [
-            _Plate(size: plate),
-            _AgentState(state: voice),
-            Expanded(
-              child: voice.turns.isEmpty
-                  ? _Waiting(live: voice.isLive)
-                  : _Thread(turns: voice.turns),
-            ),
-            if (voice.failure case final failure?) _Failure(message: failure),
-            Padding(
-              padding: const EdgeInsets.only(bottom: Space.md),
-              child: MicButton(
-                onTap: voice.isLive ? conversation.stop : conversation.start,
-                listening: voice.isLive,
-                tooltip: voice.isLive ? 'End the conversation' : 'Start talking',
-              ),
-            ),
-          ],
+            // Side by side once there is room for it. On a phone the plate sits
+            // above the conversation; on a tablet or a browser window they are
+            // columns, because a chat stretched across 1600 pixels is a chat
+            // nobody can read a line of.
+            final wide = constraints.maxWidth >= 840;
+
+            final conversation = Column(
+              children: [
+                _AgentState(state: voice),
+                Expanded(
+                  child: voice.turns.isEmpty
+                      ? _Waiting(live: voice.isLive)
+                      : _Thread(turns: voice.turns),
+                ),
+                if (voice.failure case final failure?) _Failure(message: failure),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: Space.md),
+                  child: MicButton(
+                    onTap: voice.isLive ? conversation0.stop : conversation0.start,
+                    listening: voice.isLive,
+                    tooltip: voice.isLive ? 'End the conversation' : 'Start talking',
+                  ),
+                ),
+              ],
+            );
+
+            if (!wide) {
+              final plate = (constraints.maxHeight * 0.30).clamp(110.0, 240.0);
+              return Column(
+                children: [
+                  _Plate(size: plate),
+                  const _SelectedPatch(compact: true),
+                  Expanded(child: conversation),
+                ],
+              );
+            }
+
+            // A third of the width for the plate and what was chosen, the rest
+            // for the conversation.
+            final plate = (constraints.maxWidth / 3).clamp(200.0, 340.0);
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  width: constraints.maxWidth / 3,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _Plate(size: plate),
+                        const _SelectedPatch(compact: false),
+                      ],
+                    ),
+                  ),
+                ),
+                const VerticalDivider(width: 1, color: PlateColors.line),
+                Expanded(child: conversation),
+              ],
             );
           },
         ),
@@ -270,31 +304,85 @@ class _AgentState extends StatelessWidget {
   }
 }
 
-class _Thread extends StatelessWidget {
+/// The conversation, which follows itself.
+///
+/// A transcript that does not scroll is a transcript nobody reads: the newest
+/// line is the one being spoken, and it has to be the one on screen.
+class _Thread extends StatefulWidget {
   const _Thread({required this.turns});
 
   final List<VoiceTurn> turns;
 
   @override
+  State<_Thread> createState() => _ThreadState();
+}
+
+class _ThreadState extends State<_Thread> {
+  final _controller = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // The thread replaces the "tap to talk" panel, so its first frame is a
+    // build rather than an update — and by then there can already be a
+    // conversation's worth of lines above the fold.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _toBottom());
+  }
+
+  @override
+  void didUpdateWidget(_Thread old) {
+    super.didUpdateWidget(old);
+    // Growing partials change the last line's height without adding a turn, so
+    // this follows every rebuild rather than only new entries.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _toBottom());
+  }
+
+  void _toBottom() {
+    if (!_controller.hasClients) return;
+    final end = _controller.position.maxScrollExtent;
+    // Jump rather than animate when a long way off — an animation chasing a
+    // transcript that is still growing never arrives.
+    if ((end - _controller.offset).abs() > 400) {
+      _controller.jumpTo(end);
+    } else {
+      _controller.animateTo(
+        end,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: Space.lg),
-      itemCount: turns.length,
-      itemBuilder: (context, i) => _Bubble(turn: turns[i]),
+      controller: _controller,
+      padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.sm),
+      itemCount: widget.turns.length,
+      itemBuilder: (context, i) => _Bubble(turn: widget.turns[i], index: i),
     );
   }
 }
 
 class _Bubble extends ConsumerWidget {
-  const _Bubble({required this.turn});
+  const _Bubble({required this.turn, required this.index});
 
   final VoiceTurn turn;
+
+  /// Where this sits in the thread, so "show more" knows which row to grow.
+  final int index;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // A turn carrying options is the engine's answer, not something anyone
     // said out loud. It gets the whole width.
-    if (turn.options.isNotEmpty) return _Options(options: turn.options);
+    if (turn.options.isNotEmpty) return _Options(turn: turn, index: index);
     if (turn.text.isEmpty) return const SizedBox.shrink();
 
     final mine = turn.fromUser;
@@ -333,21 +421,25 @@ class _Bubble extends ConsumerWidget {
                       ),
                 ),
               ),
-            // Every settled thing the agent says is a place you can stop
-            // talking and just ask for the answer.
+            // A pointer, not a control. The cards below are the thing to
+            // press; a second button that did the same job would only make
+            // someone wonder which of the two was the real one.
             if (!mine && turn.settled)
               Padding(
                 padding: const EdgeInsets.only(top: Space.xs),
-                child: TextButton.icon(
-                  onPressed: () =>
-                      ref.read(voiceConversationProvider.notifier).recommendNow(),
-                  icon: const Icon(LucideIcons.sparkles, size: 16),
-                  label: const Text('Add patch now'),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: Space.sm),
-                    minimumSize: const Size(0, 32),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(LucideIcons.arrowDown, size: 14, color: PlateColors.inkSoft),
+                    const SizedBox(width: Space.xs),
+                    Text(
+                      'Select from patches below',
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelSmall
+                          ?.copyWith(color: PlateColors.inkSoft),
+                    ),
+                  ],
                 ),
               ),
           ],
@@ -361,15 +453,20 @@ class _Bubble extends ConsumerWidget {
 ///
 /// The plate redraws for whichever one is selected, and the Worker caches by
 /// content — so going back to one already seen is instant and costs nothing.
-/// Trying all three is meant to be cheap.
+/// Trying them is meant to be cheap.
+///
+/// Three at a time. The engine has more, and they are behind the last card,
+/// because three is a choice and nine is a menu.
 class _Options extends ConsumerWidget {
-  const _Options({required this.options});
+  const _Options({required this.turn, required this.index});
 
-  final List<Patch> options;
+  final VoiceTurn turn;
+  final int index;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final chosen = ref.watch(chosenPatchProvider)?.addition.id;
+    final shown = turn.options.take(turn.shown).toList();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: Space.md),
@@ -387,21 +484,68 @@ class _Options extends ConsumerWidget {
             ),
           ),
           SizedBox(
-            height: 172,
+            height: 176,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              itemCount: options.length,
+              itemCount: shown.length + (turn.hasMore ? 1 : 0),
               separatorBuilder: (_, _) => const SizedBox(width: Space.sm),
-              itemBuilder: (context, i) => _OptionCard(
-                patch: options[i],
-                selected: options[i].addition.id == chosen,
-                onTap: () =>
-                    ref.read(voiceConversationProvider.notifier).choose(options[i]),
-              ),
+              itemBuilder: (context, i) {
+                if (i == shown.length) {
+                  return _MoreCard(
+                    onTap: () =>
+                        ref.read(voiceConversationProvider.notifier).revealMore(index),
+                  );
+                }
+                return _OptionCard(
+                  patch: shown[i],
+                  selected: shown[i].addition.id == chosen,
+                  onTap: () =>
+                      ref.read(voiceConversationProvider.notifier).choose(shown[i]),
+                );
+              },
             ),
           ),
-          const _KeepThis(),
         ],
+      ),
+    );
+  }
+}
+
+/// The last card in the row: one more suggestion, if none of these fit.
+class _MoreCard extends StatelessWidget {
+  const _MoreCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(kRadiusSmall),
+        child: Container(
+          width: 150,
+          padding: const EdgeInsets.all(Space.md),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(kRadiusSmall),
+            border: Border.all(color: PlateColors.line, width: 2),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(LucideIcons.plus, size: 20, color: PlateColors.green),
+              const SizedBox(height: Space.sm),
+              Text(
+                'Show more recommendations',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: PlateColors.green,
+                    ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -466,9 +610,16 @@ class _OptionCard extends StatelessWidget {
   }
 }
 
-/// Keeping the plate, once one has been settled on.
-class _KeepThis extends ConsumerWidget {
-  const _KeepThis();
+/// What is on the plate right now, under the plate.
+///
+/// It changes with the selection rather than appearing once at the end: the
+/// point of tapping through the options is seeing each one land.
+class _SelectedPatch extends ConsumerWidget {
+  const _SelectedPatch({required this.compact});
+
+  /// On a phone this sits between the plate and the conversation, and both
+  /// need the room.
+  final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -478,20 +629,47 @@ class _KeepThis extends ConsumerWidget {
     final visual = ref.watch(plateVisualProvider);
     final result = ref.watch(patchResultProvider);
 
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: TextButton.icon(
-        onPressed: () => savePatch(
-          context,
-          ref,
-          slot: result.slot,
-          foodIds: result.foods.map((f) => f.id).toList(),
-          addition: chosen.addition,
-          gapIds: result.gaps.map((g) => g.id).toList(),
-          image: visual.image,
+    return Padding(
+      padding: EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, compact ? Space.sm : Space.md),
+      child: PlateCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            PatchHighlight(
+              icon: catalogIcon(chosen.addition.icon),
+              name: chosen.addition.name,
+              how: compact ? null : chosen.addition.how,
+              compact: compact,
+            ),
+            if (!compact) ...[
+              const SizedBox(height: Space.sm),
+              Text(
+                chosen.reason,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: PlateColors.inkSoft),
+              ),
+            ],
+            const SizedBox(height: Space.xs),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => savePatch(
+                  context,
+                  ref,
+                  slot: result.slot,
+                  foodIds: result.foods.map((f) => f.id).toList(),
+                  addition: chosen.addition,
+                  gapIds: result.gaps.map((g) => g.id).toList(),
+                  image: visual.image,
+                ),
+                icon: const Icon(LucideIcons.bookmark, size: 18),
+                label: const Text('Keep this'),
+              ),
+            ),
+          ],
         ),
-        icon: const Icon(LucideIcons.bookmark, size: 18),
-        label: const Text('Keep this'),
       ),
     );
   }

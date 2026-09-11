@@ -69,12 +69,18 @@ class PatchEngine {
       if (score > 0) scored[a] = score;
     }
 
+    final rounds = _rounds(scored, gaps, severity);
+
     return PatchResult(
       slot: slot,
       foods: foods,
       totals: totals,
       gaps: gaps,
-      patches: _pick(scored, gaps, severity),
+      patches: rounds.isEmpty ? const [] : rounds.first,
+      // Everything the same angles would have picked next. The screen keeps
+      // them behind a "show more", so someone who does not like any of the
+      // first three is not stuck with them.
+      alternates: rounds.skip(1).expand((round) => round).toList(),
       headline: _headline(gaps, insight),
     );
   }
@@ -162,13 +168,41 @@ class PatchEngine {
   /// — otherwise a thin candidate list leaves the plant card empty.
   static const _resolveOrder = [PickAngle.plantBased, PickAngle.fastest, PickAngle.cheapest];
 
-  /// Up to three distinct additions, one per angle, returned in display order.
-  /// When the candidate list is too thin to fill every angle, fewer cards are
-  /// returned rather than the same addition twice.
-  List<Patch> _pick(Map<Addition, double> scored, List<Nutrient> gaps, Map<Nutrient, int> severity) {
+  /// How many rounds of three are worth keeping. Past this the additions stop
+  /// being answers to the plate and start being the rest of the catalogue.
+  static const _maxRounds = 3;
+
+  /// The picks, in rounds.
+  ///
+  /// The first round is the answer — one addition per angle. Each further
+  /// round is what those same angles would have picked next, which is what
+  /// makes an alternate a real second choice rather than an arbitrary one.
+  List<List<Patch>> _rounds(
+    Map<Addition, double> scored,
+    List<Nutrient> gaps,
+    Map<Nutrient, int> severity,
+  ) {
     if (scored.isEmpty) return const [];
 
     final taken = <String>{};
+    final rounds = <List<Patch>>[];
+    for (var round = 0; round < _maxRounds; round++) {
+      final picks = _pick(scored, gaps, severity, taken);
+      if (picks.isEmpty) break;
+      rounds.add(picks);
+    }
+    return rounds;
+  }
+
+  /// One addition per angle, skipping anything already [taken], in display
+  /// order. When the candidate list is too thin to fill every angle, fewer
+  /// cards come back rather than the same addition twice.
+  List<Patch> _pick(
+    Map<Addition, double> scored,
+    List<Nutrient> gaps,
+    Map<Nutrient, int> severity,
+    Set<String> taken,
+  ) {
     final patches = <Patch>[];
 
     for (final angle in _resolveOrder) {

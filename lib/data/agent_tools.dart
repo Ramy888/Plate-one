@@ -230,14 +230,19 @@ class AgentTools {
     }
 
     final result = recommend();
+    // Alternates are offered too: the screen can reveal them, so choose_patch
+    // has to recognise them. The model is only told about the first three —
+    // three is a choice to read out, nine is a menu.
     _offered
       ..clear()
-      ..addEntries(result.patches.map((p) => MapEntry(p.addition.id, p)));
+      ..addEntries(
+        [...result.patches, ...result.alternates].map((p) => MapEntry(p.addition.id, p)),
+      );
     // A new recommendation invalidates the old choice: the plate moved.
     _chosen = null;
     _gapIds = result.gaps.map((g) => g.id).toList();
 
-    onRecommendations?.call(result.patches);
+    onRecommendations?.call([...result.patches, ...result.alternates]);
 
     return {
       'status': result.patches.isEmpty ? 'balanced' : 'ok',

@@ -22,6 +22,7 @@ class VoiceTurn {
     this.settled = false,
     this.interrupted = false,
     this.options = const [],
+    this.shown = 3,
   });
 
   final bool fromUser;
@@ -39,13 +40,22 @@ class VoiceTurn {
   /// Rendered as a row of cards the person can tap instead of speaking.
   final List<Patch> options;
 
-  VoiceTurn copyWith({String? text, bool? settled, bool? interrupted}) => VoiceTurn(
+  /// How many of [options] are on screen. The rest sit behind "show more" —
+  /// three is a choice, nine is a menu.
+  final int shown;
+
+  VoiceTurn copyWith({String? text, bool? settled, bool? interrupted, int? shown}) =>
+      VoiceTurn(
         fromUser: fromUser,
         text: text ?? this.text,
         settled: settled ?? this.settled,
         interrupted: interrupted ?? this.interrupted,
         options: options,
+        shown: shown ?? this.shown,
       );
+
+  /// Whether anything is still held back.
+  bool get hasMore => options.length > shown;
 }
 
 /// Everything the voice screen draws, and nothing it does not.
@@ -246,9 +256,16 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
     );
   }
 
-  /// The "Add patch now" path: run the engine and offer what it says, without
-  /// waiting for the conversation to reach the question.
-  void recommendNow() => offer(ref.read(agentToolsProvider).recommendNow());
+  /// Reveals one more option in the row at [turnIndex].
+  void revealMore(int turnIndex) {
+    if (turnIndex < 0 || turnIndex >= state.turns.length) return;
+    final turn = state.turns[turnIndex];
+    if (!turn.hasMore) return;
+
+    final turns = [...state.turns];
+    turns[turnIndex] = turn.copyWith(shown: turn.shown + 1);
+    state = state.copyWith(turns: turns);
+  }
 
   /// Draws one of the offered options, as though it had been agreed out loud.
   void choose(Patch patch) {

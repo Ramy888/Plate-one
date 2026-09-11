@@ -382,6 +382,7 @@ class PatchResult {
     required this.gaps,
     required this.patches,
     required this.headline,
+    this.alternates = const [],
   });
 
   final MealSlot slot;
@@ -391,6 +392,11 @@ class PatchResult {
   /// Missing nutrients, most important first. Empty when the plate is balanced.
   final List<Nutrient> gaps;
   final List<Patch> patches;
+
+  /// Further picks, best first, for anyone who does not want any of the three.
+  /// Revealed one at a time rather than shown all at once — three is a choice,
+  /// nine is a menu.
+  final List<Patch> alternates;
 
   /// The "what may be missing" line shown at the top of the result screen.
   final String headline;

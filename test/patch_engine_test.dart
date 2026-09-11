@@ -335,4 +335,37 @@ void main() {
       }
     });
   });
+
+  group('alternates', () {
+    test('are what the same angles would have picked next', () {
+      // Not an arbitrary tail of the catalogue: each round is the three angles
+      // choosing again from what is left, so a second choice is a real one.
+      final result = _run(foods: [_food('rice')], isPro: true);
+
+      expect(result.patches, isNotEmpty);
+      expect(result.alternates, isNotEmpty);
+
+      final shown = result.patches.map((p) => p.addition.id).toSet();
+      final extra = result.alternates.map((p) => p.addition.id).toList();
+      expect(extra.toSet().intersection(shown), isEmpty,
+          reason: 'an alternate that is already on screen is not an alternative');
+      expect(extra.toSet(), hasLength(extra.length), reason: 'no repeats');
+    });
+
+    test('carry a reason, the same as the first three do', () {
+      final result = _run(foods: [_food('rice')], isPro: true);
+      for (final patch in result.alternates) {
+        expect(patch.reason, isNotEmpty, reason: patch.addition.name);
+      }
+    });
+
+    test('are empty when there is nothing to patch', () {
+      final balanced = _run(
+        foods: [_food('big_plate', protein: 3, fibre: 3, fat: 2)],
+        isPro: true,
+      );
+      expect(balanced.patches, isEmpty);
+      expect(balanced.alternates, isEmpty);
+    });
+  });
 }
