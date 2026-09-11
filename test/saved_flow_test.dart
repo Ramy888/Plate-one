@@ -127,6 +127,22 @@ void main() {
         reason: 'held to a readable column, not the whole window');
   });
 
+  testWidgets('the after-meal check is readable in a wide window too',
+      (tester) async {
+    await _pump(
+      tester,
+      history: [_patch(id: 'p1')],
+      size: const Size(3200, 1800),
+    );
+
+    await tester.tap(find.text('How did it go?'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Saved. How did it go?'), findsOneWidget);
+    final choice = tester.getSize(find.byType(ChoiceRow).first);
+    expect(choice.width, lessThanOrEqualTo(720));
+  });
+
   testWidgets('tapping a saved row opens its details', (tester) async {
     await _pump(tester, history: [_patch()]);
 

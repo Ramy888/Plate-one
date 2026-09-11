@@ -27,10 +27,12 @@ class CheckScreen extends ConsumerWidget {
         ],
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: Readable(
+          // Scrollable as well as narrow: three choices and two paragraphs are
+          // taller than a short window, and the last choice being the one off
+          // the bottom edge is the whole question going unanswered.
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.lg),
             children: [
               Text('Saved. How did it go?',
                   style: Theme.of(context).textTheme.displaySmall),
