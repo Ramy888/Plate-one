@@ -18,6 +18,7 @@ on top of it.
 | `GET` | `/v1/quota` | Current allowance, without spending any |
 | `GET` | `/v1/preview/{id}.jpg` | Serve a generated plate |
 | `POST` | `/v1/plate` | Write up and draw a plate. Ids in, never words. Addition optional |
+| `POST` | `/v1/plate/keep` | End the free try. The plate itself stays on the device |
 | `POST` | `/v1/voice/token` | Mint a single-use AssemblyAI Voice Agent token |
 | `POST` | `/v1/promo` | Redeem a code for more conversations |
 | `POST` | `/v1/report` | Report an AI result |
@@ -28,13 +29,13 @@ on top of it.
 There is no paid tier and nothing to sign into: a judge, or anyone else, opens
 the URL and talks. Two limits stand behind that.
 
-| | Conversations | Pictures | Window |
-|---|---|---|---|
-| Per device | 12 | 30 | per day |
-| Whole deployment | `GLOBAL_CALLS_PER_DAY` (2000), across both | | per day |
+| | Free tries | Pictures | Conversations | Window |
+|---|---|---|---|---|
+| Per device | 1 | 10 | 30 | per day |
+| Whole deployment | `GLOBAL_CALLS_PER_DAY` (2000), across all of it | | | per day |
 
-Pictures outnumber conversations because one conversation draws several: the
-plate is redrawn as the meal fills in, and again for each suggestion tried.
+One try draws the meal a few times over as it is described, and again for each
+suggestion tried, which is why pictures outnumber tries by ten.
 
 The per-device allowance stops one phone running up a bill. It does nothing
 about a hundred phones, or one script rotating device ids — which is exactly
@@ -55,31 +56,36 @@ single-threaded per id, so the race cannot occur — no transactions, no
 optimistic retries. `QUOTA` has one instance per device; `GLOBAL_CAP` has
 exactly one, for everybody.
 
-**Talking is open; drawing needs a sign-in.** AssemblyAI is free for this
-event, so the conversation costs us nothing and has no door on it. A drawn
-plate is a Gemini call and a Workers AI image — real money — so `/v1/plate`
-requires an account when `GOOGLE_CLIENT_ID` is set, and says so in a sentence
-that also says what still works. With no client id configured the whole thing
-is anonymous again, exactly as before.
+**One free plate a day, and keeping it is what spends it.**
 
-A Google ID token is verified here rather than by asking Google: it is an
-RS256 JWT and Google publishes the keys. Signature, audience, issuer, expiry —
-and the audience check is the one that is easy to leave out. A validly signed
-Google token issued to somebody else's application is still validly signed.
+A try is the whole journey: talk, be recommended something, watch it drawn.
+Trying all three suggestions costs nothing — it is one try either way — and
+`POST /v1/plate/keep` is the door at the end of the corridor. Drawing is
+refused once the try is over, because there is nothing left to do with the
+picture.
 
-**What is stored is a SHA-256 of the Google subject.** Not the subject, not the
-email, not the name. The app needs to know that two devices are the same
-person; a hash answers that and answers nothing else. The allowance is keyed on
-it, so a phone and a laptop share one and signing out and back in does not mint
-a second.
+AssemblyAI is free for this event, so talking has no door on it at all. A drawn
+plate is a Gemini call and a Workers AI image, which is real money, and that is
+what the counter is for.
 
 **Promo codes live in a secret, never in this repository.** It is public and
 MIT licensed: a list of codes in the client, a migration or a seed file is a
-list of free credits for everyone who reads it. `PROMO_CODES` is `CODE:grants`
-pairs; `worker/src/promo.ts` explains the rest. Redemptions are recorded per
-person, and a code's total use is capped by `PROMO_USES_PER_CODE`.
+list of free credits for everyone who reads it. Hashes would not help either —
+a code this short has few enough possibilities to walk through, which is also
+why `/v1/promo` has a tight per-IP ceiling and a test that drains it.
 
-**The API key never reaches the client.** A browser cannot set an
+`PROMO_CODES` is `CODE:grants` pairs. A code grants that many more tries, the
+conversations to have them in, and ten times as many pictures — a code that
+granted only tries would run out of pictures inside the first one. What it
+grants survives the daily reset: a code handed out in the evening that expires
+at midnight is barely a code.
+
+Redemptions are recorded per device, and a code's total use is capped by
+`PROMO_USES_PER_CODE`. The primary key on `(code_hash, redeemer)` is what
+actually enforces the first of those; the check in front of it only turns a
+constraint violation into a sentence.
+
+**The API key never reaches the client.****The API key never reaches the client.** A browser cannot set an
 `Authorization` header on a WebSocket, so `/v1/voice/token` mints a single-use
 AssemblyAI token and the client opens `wss://agents.assemblyai.com/v1/ws?token=…`
 with that. The audio never comes here — it goes straight from the browser to
@@ -162,7 +168,7 @@ npx wrangler r2 bucket create plateone-previews
 cp ../.env.example .dev.vars             # then fill it in
 npm run migrate:local
 npm run dev
-npx vitest run                           # 85 tests
+npx vitest run                           # 76 tests
 ```
 
 The R2 bucket wants a lifecycle rule deleting anything under `p/` after 24
