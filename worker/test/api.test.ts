@@ -88,11 +88,13 @@ describe('health', () => {
   });
 
   it('names the models it will call', async () => {
+    // Read from the bindings: a deployment that swaps a model should say so
+    // without anybody remembering to edit a test.
     const body = (await (await call('GET', '/health')).json()) as {
-      models: { vision: string; image: string };
+      models: { caption: string; image: string };
     };
-    expect(body.models.vision).toBe('gemini-3.7-flash');
-    expect(body.models.image).toBe('gemini-3.1-flash-image');
+    expect(body.models.caption).toBe(env.MODEL_CHAT);
+    expect(body.models.image).toBe(env.MODEL_CHAT_IMAGE);
   });
 });
 

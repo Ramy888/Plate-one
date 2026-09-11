@@ -185,7 +185,8 @@ async function handle(request: Request, env: Env, ctx: ExecutionContext): Promis
         budget,
         // Whether voice can work at all, without saying anything about the key.
         voice: env.ASSEMBLYAI_API_KEY ? 'configured' : 'unconfigured',
-        models: { vision: env.MODEL_VISION, image: env.MODEL_IMAGE },
+        // What draws a plate: a caption model and an image model.
+        models: { caption: env.MODEL_CHAT, image: env.MODEL_CHAT_IMAGE },
       });
     }
 

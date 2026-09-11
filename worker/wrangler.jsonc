@@ -15,7 +15,7 @@
     {
       "binding": "DB",
       "database_name": "plateone",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+      "database_id": "72f9c5c4-1ff0-4490-aeab-653a8d550a6a",
       "migrations_dir": "migrations"
     }
   ],
@@ -52,9 +52,6 @@
   ],
 
   "vars": {
-    "MODEL_VISION": "gemini-3.7-flash",
-    "MODEL_IMAGE": "gemini-3.1-flash-image",
-
     // Gemini writes the words, Workers AI draws the plate. Flux is an order of
     // magnitude cheaper per image than the Gemini image model, which is why the
     // written-up plate uses it and the photo-editing preview does not.
@@ -97,7 +94,7 @@
     // secret — see src/promo.ts — because this repository is public.
     "PROMO_USES_PER_CODE": "1",
 
-    "ALLOWED_ORIGINS": "https://plateone.pages.dev,http://localhost:8080,http://localhost:8000"
+    "ALLOWED_ORIGINS": "https://plateone.pages.dev,https://plate-one.pages.dev,http://localhost:8080,http://localhost:8000"
   }
 
   // Secrets, set with `wrangler secret put`:
