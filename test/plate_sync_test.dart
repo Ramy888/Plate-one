@@ -13,7 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///
 /// The count is the whole point: a conversation moves faster than a picture,
 /// and the failure this guards against is paying for plates nobody ever sees.
-class _SlowApi implements ScanApi {
+class _SlowApi implements PlateApi {
   _SlowApi({this.delay = const Duration(milliseconds: 200)});
 
   final Duration delay;
@@ -34,7 +34,7 @@ class _SlowApi implements ScanApi {
       additionId: additionId,
       imageUrl: null,
       disclaimer: 'test',
-      quota: ScanQuota(
+      quota: Allowance(
         previews: 9,
         voice: 9,
         resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
@@ -46,7 +46,7 @@ class _SlowApi implements ScanApi {
   Future<DeviceRegistration> registerDevice({required String platform}) async =>
       DeviceRegistration(
         token: 'device-token',
-        quota: ScanQuota(
+        quota: Allowance(
             previews: 9,
           voice: 9,
           resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
@@ -64,7 +64,7 @@ Future<ProviderContainer> _container(_SlowApi api) async {
   final container = ProviderContainer(
     overrides: [
       prefsRepositoryProvider.overrideWithValue(prefs),
-      scanApiProvider.overrideWithValue(api),
+      apiProvider.overrideWithValue(api),
     ],
   );
   addTearDown(container.dispose);

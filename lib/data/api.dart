@@ -9,8 +9,8 @@ import 'package:http/http.dart' as http;
 /// Every failure is turned into something the UI can say out loud, because the
 /// answer to "recognition did not work" is always "build the meal by hand",
 /// never a dead end.
-class ScanApi {
-  ScanApi({
+class PlateApi {
+  PlateApi({
     required this.baseUrl,
     http.Client? client,
     this.timeout = const Duration(seconds: 45),
@@ -41,15 +41,15 @@ class ScanApi {
     final body = _decode(response);
     return DeviceRegistration(
       token: body['deviceToken'] as String,
-      quota: ScanQuota.fromJson(body['quota'] as Map<String, dynamic>),
+      quota: Allowance.fromJson(body['quota'] as Map<String, dynamic>),
     );
   }
 
-  Future<ScanQuota> quota(String deviceToken) async {
+  Future<Allowance> quota(String deviceToken) async {
     final response = await _send(
       () => _client.get(_uri('/v1/quota'), headers: _auth(deviceToken)),
     );
-    return ScanQuota.fromJson(_decode(response));
+    return Allowance.fromJson(_decode(response));
   }
 
   /// Writes up and draws a plate.
@@ -98,7 +98,7 @@ class ScanApi {
       timeout: const Duration(seconds: 60),
     );
     if (response.statusCode != 200) {
-      throw const ScanFailure(ScanError.unknown, 'That preview could not be loaded.');
+      throw const ApiFailure(ApiError.unknown, 'That preview could not be loaded.');
     }
     return response.bodyBytes;
   }
@@ -143,11 +143,11 @@ class ScanApi {
   }) async {
     try {
       return await run().timeout(timeout ?? this.timeout);
-    } on ScanFailure {
+    } on ApiFailure {
       rethrow;
     } catch (_) {
-      throw const ScanFailure(
-        ScanError.offline,
+      throw const ApiFailure(
+        ApiError.offline,
         'No connection. You can still build the meal by hand.',
       );
     }
@@ -166,13 +166,13 @@ class ScanApi {
     final code = body['error'] as String? ?? '';
     final message = body['message'] as String? ??
         'Something went wrong. You can still build the meal by hand.';
-    throw ScanFailure(ScanError.fromCode(code, response.statusCode), message);
+    throw ApiFailure(ApiError.fromCode(code, response.statusCode), message);
   }
 
   void close() => _client.close();
 }
 
-enum ScanError {
+enum ApiError {
   offline,
   quotaExhausted,
   busy,
@@ -185,45 +185,45 @@ enum ScanError {
   rejected,
   unknown;
 
-  static ScanError fromCode(String code, int status) => switch (code) {
-        'quota_exhausted' => ScanError.quotaExhausted,
-        'preview_expired' => ScanError.pictureExpired,
-        'plate_unavailable' || 'plate_blocked' => ScanError.busy,
-        'invalid_addition' || 'invalid_food' => ScanError.rejected,
-        'voice_unavailable' || 'voice_unconfigured' => ScanError.busy,
-        'invalid_field' => ScanError.rejected,
-        'rate_limited' => ScanError.rateLimited,
-        'unknown_device' || 'unauthorized' => ScanError.unauthorized,
-        _ => status == 429 ? ScanError.rateLimited : ScanError.unknown,
+  static ApiError fromCode(String code, int status) => switch (code) {
+        'quota_exhausted' => ApiError.quotaExhausted,
+        'preview_expired' => ApiError.pictureExpired,
+        'plate_unavailable' || 'plate_blocked' => ApiError.busy,
+        'invalid_addition' || 'invalid_food' => ApiError.rejected,
+        'voice_unavailable' || 'voice_unconfigured' => ApiError.busy,
+        'invalid_field' => ApiError.rejected,
+        'rate_limited' => ApiError.rateLimited,
+        'unknown_device' || 'unauthorized' => ApiError.unauthorized,
+        _ => status == 429 ? ApiError.rateLimited : ApiError.unknown,
       };
 
   /// Whether the user can usefully try the same thing again.
   bool get isRetryable =>
-      this == ScanError.busy || this == ScanError.offline || this == ScanError.unknown;
+      this == ApiError.busy || this == ApiError.offline || this == ApiError.unknown;
 
   /// Whether the allowance, rather than the request, is what went wrong.
-  bool get isOutOfAllowance => this == ScanError.quotaExhausted;
+  bool get isOutOfAllowance => this == ApiError.quotaExhausted;
 }
 
-class ScanFailure implements Exception {
-  const ScanFailure(this.error, this.message);
+class ApiFailure implements Exception {
+  const ApiFailure(this.error, this.message);
 
-  final ScanError error;
+  final ApiError error;
   final String message;
 
   @override
-  String toString() => 'ScanFailure(${error.name}: $message)';
+  String toString() => 'ApiFailure(${error.name}: $message)';
 }
 
 class DeviceRegistration {
   const DeviceRegistration({required this.token, required this.quota});
 
   final String token;
-  final ScanQuota quota;
+  final Allowance quota;
 }
 
-class ScanQuota {
-  const ScanQuota({
+class Allowance {
+  const Allowance({
     required this.previews,
     required this.voice,
     required this.resetsAt,
@@ -237,7 +237,7 @@ class ScanQuota {
   final DateTime resetsAt;
 
   /// Before the device has ever registered.
-  static final unknown = ScanQuota(
+  static final unknown = Allowance(
     previews: 0,
     voice: 0,
     resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
@@ -245,7 +245,7 @@ class ScanQuota {
 
   bool get hasVoice => voice > 0;
 
-  factory ScanQuota.fromJson(Map<String, dynamic> json) => ScanQuota(
+  factory Allowance.fromJson(Map<String, dynamic> json) => Allowance(
         previews: (json['previews'] as num?)?.toInt() ?? 0,
         voice: (json['voice'] as num?)?.toInt() ?? 0,
         resetsAt: DateTime.fromMillisecondsSinceEpoch(
@@ -273,7 +273,7 @@ class VoiceToken {
   /// a forgotten tab stops costing money before the server has to cut it off.
   final int maxSessionSeconds;
 
-  final ScanQuota quota;
+  final Allowance quota;
 
   factory VoiceToken.fromJson(Map<String, dynamic> json) => VoiceToken(
         token: json['token'] as String? ?? '',
@@ -281,7 +281,7 @@ class VoiceToken {
           ((json['expiresAt'] as num?)?.toInt() ?? 0) * 1000,
         ),
         maxSessionSeconds: (json['maxSessionSeconds'] as num?)?.toInt() ?? 600,
-        quota: ScanQuota.fromJson(
+        quota: Allowance.fromJson(
           (json['quota'] as Map<String, dynamic>?) ?? const {},
         ),
       );
@@ -314,7 +314,7 @@ class ChatReply {
 
   /// Shown with the image, always. Never dismissible.
   final String disclaimer;
-  final ScanQuota quota;
+  final Allowance quota;
 
   factory ChatReply.fromJson(Map<String, dynamic> json) => ChatReply(
         messageId: json['messageId'] as String? ?? '',
@@ -327,7 +327,7 @@ class ChatReply {
         imageUrl: json['imageUrl'] as String?,
         disclaimer: json['disclaimer'] as String? ??
             'AI visual preview — appearance and serving size are illustrative.',
-        quota: ScanQuota.fromJson((json['quota'] as Map?)?.cast<String, dynamic>() ?? const {}),
+        quota: Allowance.fromJson((json['quota'] as Map?)?.cast<String, dynamic>() ?? const {}),
       );
 }
 /// What the model could and could not see. Advisory only — the rule engine

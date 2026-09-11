@@ -208,7 +208,7 @@ class VoiceAgentSession implements VoiceSession {
       // the difference between a dead end and an explanation.
       _failure = switch (error) {
         VoiceFailure(:final message) => message,
-        ScanFailure(:final message) => message,
+        ApiFailure(:final message) => message,
         _ => 'Voice could not start.',
       };
       _emitState(VoiceAgentState.ended);

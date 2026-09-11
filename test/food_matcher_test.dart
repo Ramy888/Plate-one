@@ -106,7 +106,7 @@ void main() {
     });
   });
 
-  group('matching a whole scan', () {
+  group('matching a whole plate at once', () {
     test('maps a real result onto catalogue foods', () {
       final matched = matcher.matchAll(
         [

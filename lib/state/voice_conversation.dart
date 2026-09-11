@@ -186,7 +186,7 @@ final voiceSessionFactoryProvider = Provider<VoiceSessionFactory>((ref) {
   return () => VoiceAgentSession(
         mintToken: () async {
           final token = await ref.read(deviceProvider.notifier).token();
-          final minted = await ref.read(scanApiProvider).voiceToken(token);
+          final minted = await ref.read(apiProvider).voiceToken(token);
           // Keep the camera's "N left" honest after a conversation spends one.
           ref.read(deviceProvider.notifier).noteQuota(minted.quota);
           return minted;

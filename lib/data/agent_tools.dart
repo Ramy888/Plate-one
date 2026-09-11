@@ -322,8 +322,8 @@ class AgentTools {
     // ask about them.
     //
     // The guard lives here rather than in FoodMatcher because this is where
-    // free-form speech enters; the scan path's labels come from a vision model
-    // asked for food names, which is a different kind of input.
+    // free-form speech enters: a whole sentence can arrive as one "food", and
+    // nothing else in the app hands the matcher anything but a short name.
     final usable = names.where((n) => _looksLikeFoodName(n)).toList();
     final tooLong = names.where((n) => !_looksLikeFoodName(n)).toList();
 

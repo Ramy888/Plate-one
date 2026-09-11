@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plateone/data/api.dart';
+import 'package:plateone/state/api_providers.dart';
 import 'package:plateone/data/catalog.dart';
 import 'package:plateone/data/patch_images.dart';
 import 'package:plateone/data/prefs_repository.dart';
@@ -34,10 +36,30 @@ Catalog _realCatalog() {
   );
 }
 
+/// A Worker that answers the one call settings makes, and counts it.
+class _QuotaApi implements PlateApi {
+  int asked = 0;
+
+  @override
+  Future<Allowance> quota(String deviceToken) async {
+    asked++;
+    return Allowance(
+      previews: 27,
+      voice: 9,
+      resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName} is not part of this test');
+}
+
 Future<ProviderContainer> _pumpApp(
   WidgetTester tester, {
   Map<String, Object> prefs = const {},
   Widget home = const _Root(),
+  PlateApi? api,
 }) async {
   // A tall viewport so a full food grid and three suggestion cards fit without
   // scrolling. The default 800x600 test window is nothing like a phone.
@@ -52,6 +74,7 @@ Future<ProviderContainer> _pumpApp(
       prefsRepositoryProvider.overrideWithValue(repo),
       patchImagesProvider.overrideWithValue(MemoryPatchImages()),
       catalogProvider.overrideWithValue(_realCatalog()),
+      if (api != null) apiProvider.overrideWithValue(api),
     ],
   );
   addTearDown(container.dispose);
@@ -392,6 +415,24 @@ void main() {
   });
 
   group('settings', () {
+    testWidgets('the allowance is asked for, not waited for', (tester) async {
+      // It used to arrive only as a side effect of spending one, and it did not
+      // survive a reload — so this card told someone who had held six
+      // conversations to start their first.
+      final api = _QuotaApi();
+      await _pumpApp(
+        tester,
+        prefs: {'onboarded': true, 'device_token': 'device-token'},
+        home: const SettingsScreen(),
+        api: api,
+      );
+      await tester.pumpAndSettle();
+
+      expect(api.asked, 1);
+      expect(find.text('9 left today'), findsOneWidget);
+      expect(find.textContaining('Start a conversation'), findsNothing);
+    });
+
     testWidgets('a goal chosen at onboarding can be changed later',
         (tester) async {
       final container = await _pumpApp(

@@ -159,7 +159,7 @@ VoiceToken _token({int maxSessionSeconds = 600, String token = 'tok_live'}) => V
       token: token,
       expiresAt: DateTime.fromMillisecondsSinceEpoch(1789310995000),
       maxSessionSeconds: maxSessionSeconds,
-      quota: ScanQuota(
+      quota: Allowance(
         previews: 4,
         voice: 11,
         resetsAt: DateTime.fromMillisecondsSinceEpoch(1789310995000),
@@ -285,13 +285,13 @@ void main() {
       // "as many questions as it can today" is an explanation. "Voice could
       // not start" is a dead end, and the app promises never to be one.
       final session = build(
-        mint: () async => throw const ScanFailure(
-          ScanError.quotaExhausted,
+        mint: () async => throw const ApiFailure(
+          ApiError.quotaExhausted,
           'Plate One has answered as many questions as it can today.',
         ),
       );
 
-      await expectLater(session.start(), throwsA(isA<ScanFailure>()));
+      await expectLater(session.start(), throwsA(isA<ApiFailure>()));
       expect(session.failure, contains('as many questions as it can today'));
     });
 

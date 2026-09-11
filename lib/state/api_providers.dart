@@ -17,8 +17,8 @@ import 'providers.dart';
 /// error path ends with the user able to build the meal by hand, because that
 /// path has no network, no allowance and no model in it.
 
-final scanApiProvider = Provider<ScanApi>((ref) {
-  final api = ScanApi(baseUrl: ScanApi.defaultBaseUrl);
+final apiProvider = Provider<PlateApi>((ref) {
+  final api = PlateApi(baseUrl: PlateApi.defaultBaseUrl);
   ref.onDispose(api.close);
   return api;
 });
@@ -35,16 +35,16 @@ class DeviceState {
   /// What is left today, as last reported. Null before the device has ever
   /// registered — which, for someone who only ever builds meals by hand, is
   /// forever.
-  final ScanQuota? quota;
+  final Allowance? quota;
 
-  DeviceState copyWith({ScanQuota? quota}) => DeviceState(quota: quota ?? this.quota);
+  DeviceState copyWith({Allowance? quota}) => DeviceState(quota: quota ?? this.quota);
 }
 
 class DeviceController extends Notifier<DeviceState> {
   @override
   DeviceState build() => const DeviceState();
 
-  ScanApi get _api => ref.read(scanApiProvider);
+  PlateApi get _api => ref.read(apiProvider);
   PrefsRepository get _prefs => ref.read(prefsRepositoryProvider);
 
   static String get _platform {
@@ -68,7 +68,7 @@ class DeviceController extends Notifier<DeviceState> {
 
   /// Records an allowance the server reported on some other call, so what the
   /// app shows stays honest after a conversation or a picture spends one.
-  void noteQuota(ScanQuota quota) => state = state.copyWith(quota: quota);
+  void noteQuota(Allowance quota) => state = state.copyWith(quota: quota);
 
   /// Reads the allowance without spending any. Failures are swallowed: not
   /// knowing the quota is not worth an error in front of someone.
@@ -77,7 +77,7 @@ class DeviceController extends Notifier<DeviceState> {
       final saved = _prefs.deviceToken;
       if (saved == null) return;
       state = state.copyWith(quota: await _api.quota(saved));
-    } on ScanFailure {
+    } on ApiFailure {
       // Leave the last known value in place.
     }
   }
@@ -89,7 +89,7 @@ class DeviceController extends Notifier<DeviceState> {
     if (saved != null) {
       try {
         await _api.forgetDevice(saved);
-      } on ScanFailure {
+      } on ApiFailure {
         // Logged by absence: the device row is orphaned and will be swept.
       }
       await _prefs.setDeviceToken(null);

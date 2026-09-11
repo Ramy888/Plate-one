@@ -115,7 +115,7 @@ class PlateVisualController extends Notifier<PlateVisual> {
 
     try {
       final token = await ref.read(deviceProvider.notifier).token();
-      final reply = await ref.read(scanApiProvider).plate(
+      final reply = await ref.read(apiProvider).plate(
             deviceToken: token,
             foodIds: foodIds,
             additionId: additionId,
@@ -126,7 +126,7 @@ class PlateVisualController extends Notifier<PlateVisual> {
       if (reply.imageUrl != null) {
         try {
           image = await ref
-              .read(scanApiProvider)
+              .read(apiProvider)
               .previewImage(deviceToken: token, url: reply.imageUrl!);
         } catch (_) {
           // The words still stand.
@@ -141,7 +141,7 @@ class PlateVisualController extends Notifier<PlateVisual> {
         unavailable: image == null,
       );
       ref.read(deviceProvider.notifier).noteQuota(reply.quota);
-    } on ScanFailure {
+    } on ApiFailure {
       if (_stale(key)) return;
       state = const PlateVisual(unavailable: true);
     } catch (_) {

@@ -131,10 +131,27 @@ class _LinkRow extends StatelessWidget {
 }
 
 /// How many conversations are left, without spending one to find out.
-class _VoiceAllowance extends ConsumerWidget {
+class _VoiceAllowance extends ConsumerStatefulWidget {
   const _VoiceAllowance();
 
-  static String _describe(ScanQuota? quota) {
+  @override
+  ConsumerState<_VoiceAllowance> createState() => _VoiceAllowanceState();
+}
+
+class _VoiceAllowanceState extends ConsumerState<_VoiceAllowance> {
+  @override
+  void initState() {
+    super.initState();
+    // Ask, rather than waiting to be told. Nothing else on this screen makes a
+    // call, so without this the card says "start a conversation" to someone who
+    // has had six — the number only ever arrived as a side effect of spending
+    // one, and it does not survive a reload.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => ref.read(deviceProvider.notifier).refreshQuota(),
+    );
+  }
+
+  static String _describe(Allowance? quota) {
     if (quota == null) return 'Start a conversation to see how many you have left.';
     if (!quota.hasVoice) {
       return 'None left today. Picking the food by hand is unlimited, and always will be.';
@@ -143,7 +160,7 @@ class _VoiceAllowance extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final quota = ref.watch(deviceProvider).quota;
     return PlateCard(
       padding: const EdgeInsets.all(Space.md),
