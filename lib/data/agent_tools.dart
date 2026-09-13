@@ -237,8 +237,9 @@ class AgentTools {
 
     final result = recommend();
     // Alternates are offered too: the screen can reveal them, so choose_patch
-    // has to recognise them. The model is only told about the first three —
-    // three is a choice to read out, nine is a menu.
+    // has to recognise them. The model is told the first three and only how
+    // many more there are — three is a choice to read out, nine is a menu, and
+    // a count is what lets it mention the rest without inventing them.
     _offered
       ..clear()
       ..addEntries(
@@ -254,6 +255,10 @@ class AgentTools {
       'status': result.patches.isEmpty ? 'balanced' : 'ok',
       'headline': result.headline,
       'missing': result.gaps.map((g) => g.label).toList(),
+      // Behind "Show more" on screen. A number rather than the additions
+      // themselves: the agent should be able to say there are others without
+      // being able to name one the engine did not put in front of it.
+      'more': result.alternates.length,
       'options': [
         for (final patch in result.patches)
           {

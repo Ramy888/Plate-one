@@ -141,11 +141,21 @@ void main() {
   }
 
   /// Taps the microphone and lets the state settle.
+  ///
+  /// It is in two places by design: the big one under the plate while the
+  /// screen is idle, and — once there is a conversation on a phone — an icon in
+  /// the app bar, because the thread has taken the screen by then.
   Future<void> tapMic(WidgetTester tester) async {
-    // Specifically the microphone. The app bar now has buttons of its own, and
+    final big = find.descendant(
+      of: find.byType(MicButton),
+      matching: find.byType(InkWell),
+    );
+    // Specifically the microphone. The app bar has buttons of its own, and
     // "the first InkWell" quietly became the bookmark icon.
     await tester.tap(
-      find.descendant(of: find.byType(MicButton), matching: find.byType(InkWell)),
+      big.evaluate().isNotEmpty
+          ? big
+          : find.byTooltip('End the conversation'),
     );
     // Not pumpAndSettle: the mic's ring is a real animation and settling on it
     // is slower than it is useful.
@@ -153,10 +163,26 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
   }
 
+  /// Keeps the plate the way a phone does it: the plate lives behind a handle,
+  /// so the button that acts on it is only reachable once the sheet is down.
+  Future<void> keepPlate(WidgetTester tester) async {
+    final handle = find.text('See your plate');
+    if (handle.evaluate().isNotEmpty) {
+      await tester.tap(handle);
+      // The first frame starts the slide; the second one runs it out.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    await tester.tap(find.byTooltip('Add this plate to favourite plates'));
+    // Saving is a round trip before it is a toast.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+
   testWidgets('opens quiet, and says what to do', (tester) async {
     await openHome(tester);
-    // Idle is the plate and the microphone, and nothing else. There is no
-    // transcript yet and no empty panel pretending to be one.
+    // Idle is the plate, the microphone and the one line saying what to do.
+    // There is no transcript yet and no empty panel pretending to be one.
     expect(find.text('Describe your meal'), findsOneWidget);
     expect(find.byType(MicButton), findsOneWidget);
     expect(find.textContaining('Tap the microphone'), findsNothing);
@@ -181,9 +207,6 @@ void main() {
       (VoiceAgentState.listening, 'Listening'),
       (VoiceAgentState.thinking, 'Thinking'),
       (VoiceAgentState.speaking, 'Speaking'),
-      // Ended reads the same as idle, because it is the same: an empty plate
-      // waiting to be told about.
-      (VoiceAgentState.ended, 'Describe your meal'),
     ]) {
       session.becomes(next);
       // Twice: the state arrives on a stream, and the frame that renders it
@@ -191,6 +214,16 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(find.text(label), findsOneWidget, reason: 'state $next');
+    }
+
+    // Ended reads the same as idle, because it is the same: an empty plate
+    // waiting to be told about.
+    session.becomes(VoiceAgentState.ended);
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Describe your meal'), findsOneWidget);
+    for (final label in ['Listening', 'Thinking', 'Speaking']) {
+      expect(find.text(label), findsNothing, reason: 'after ending');
     }
   });
 
@@ -359,7 +392,17 @@ void main() {
     await tester.pump();
 
     expect(container.read(chosenPatchProvider)?.addition.id, offered.first.addition.id);
-    expect(find.text('Add this plate to favourite plates'), findsOneWidget);
+    // On a phone the plate is behind a handle, so the way to keep it is behind
+    // the same one. The sheet is built either way — it is parked above the top
+    // of the screen — so this asks where it is, not whether it exists.
+    final save = find.byTooltip('Add this plate to favourite plates');
+    expect(tester.getTopLeft(save).dy, lessThan(0), reason: 'the sheet starts up out of sight');
+
+    await tester.tap(find.text('See your plate'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.getTopLeft(save).dy, greaterThanOrEqualTo(0),
+        reason: 'pulling the handle brings the plate down over the thread');
   });
 
   testWidgets('a settled reply points at the cards rather than duplicating them',
@@ -481,6 +524,7 @@ void main() {
     expect(container.read(chosenPatchProvider), isNull);
     expect(container.read(mealDraftProvider).foodIds, isEmpty);
     // Back to idle: the plate, the microphone, and nothing else.
+    expect(find.byType(MicButton), findsOneWidget);
     expect(find.text('Describe your meal'), findsOneWidget);
   });
 
@@ -539,8 +583,7 @@ void main() {
     await tester.pump();
 
     // The offer to keep it sits above the plate, not at the end of the thread.
-    expect(find.text('Add this plate to favourite plates'), findsOneWidget);
-    await tester.tap(find.text('Add this plate to favourite plates'));
+    await keepPlate(tester);
     await tester.pump();
     await tester.pump();
 
@@ -577,7 +620,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.text(offered.first.addition.name));
     await tester.pump();
-    await tester.tap(find.text('Add this plate to favourite plates'));
+    await keepPlate(tester);
     await tester.pump();
     await tester.pump();
 
@@ -600,7 +643,7 @@ void main() {
     await tester.pump();
 
     expect(keepApi.kept, 0);
-    await tester.tap(find.text('Add this plate to favourite plates'));
+    await keepPlate(tester);
     await tester.pump();
     await tester.pump();
 

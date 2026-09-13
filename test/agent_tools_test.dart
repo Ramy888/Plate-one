@@ -290,6 +290,33 @@ void main() {
     });
   });
 
+  group('what the agent is given to read out', () {
+    test('every option it should name, and a count of the rest', () async {
+      // The agent reads the options aloud as choices, so it has to receive all
+      // of them — it used to be told to name the first and stay quiet about
+      // the others. The alternates stay behind "Show more" as a number: enough
+      // to say there are more, not enough to name one the engine did not
+      // put in front of anybody.
+      final tools = build();
+      await call(tools, 'set_meal', {
+        'meal': 'lunch_dinner',
+        'foods': ['rice', 'chicken'],
+      });
+
+      final result = await call(tools, 'get_recommendation');
+      final options = result['options']! as List;
+
+      expect(options.length, greaterThan(1), reason: 'a choice, not a single answer');
+      for (final option in options.cast<Map<String, dynamic>>()) {
+        expect(option['name'], isNotEmpty);
+        expect(option['reason'], isNotEmpty, reason: 'each one is read out with why');
+      }
+      expect(result['more'], isA<int>());
+      // Named additions are only ever the ones on offer.
+      expect(result.toString(), isNot(contains('"more":null')));
+    });
+  });
+
   group('saving', () {
     test('keeps the chosen patch', () async {
       final tools = build();

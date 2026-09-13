@@ -38,6 +38,27 @@ class VoiceAgentScreen extends ConsumerWidget {
     final voice = ref.watch(voiceConversationProvider);
     final conversation0 = ref.read(voiceConversationProvider.notifier);
 
+    final active = voice.isLive || voice.turns.isNotEmpty;
+    // The app bar is built outside the LayoutBuilder, so it asks the window
+    // rather than the box it is in.
+    final narrow = MediaQuery.sizeOf(context).width < 840;
+
+    void onMic() {
+      if (voice.isLive) {
+        conversation0.stop();
+        return;
+      }
+      // Saving needs a context — it shows a toast — and the provider that
+      // builds the agent's tools has none, so the screen hands one over. Here
+      // rather than in `build`: reading the tools pulls in the catalogue, and a
+      // screen that cannot be built without one is harder to test than it needs
+      // to be. Nothing can call `save_patch` before the conversation it is
+      // part of.
+      ref.read(agentToolsProvider).onSave =
+          ({required addition, required gapIds}) =>
+              _keepPlate(context, ref, endConversation: false);
+      conversation0.start();
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -45,6 +66,10 @@ class VoiceAgentScreen extends ConsumerWidget {
         title: const _Brand(),
         actions: [
           if (voice.lastTurnLatencyMs case final ms?) _Latency(ms: ms),
+          // On a phone the microphone comes up here once there is a
+          // conversation: the thread wants the whole screen, and a control
+          // that matters this much should not be something you scroll to.
+          if (narrow && active) _AppBarMic(live: voice.isLive, onTap: onMic),
           IconButton(
             tooltip: 'Saved patches',
             icon: const Icon(LucideIcons.bookmark),
@@ -69,7 +94,6 @@ class VoiceAgentScreen extends ConsumerWidget {
             // Idle is the plate on its own, centred, with the microphone under
             // it. Everything else is the conversation, which arrives beside the
             // plate rather than in place of it.
-            final active = voice.isLive || voice.turns.isNotEmpty;
             final wide = constraints.maxWidth >= 840;
 
             final plateSize = wide
@@ -80,21 +104,7 @@ class VoiceAgentScreen extends ConsumerWidget {
               voice: voice,
               plateSize: plateSize,
               compact: !wide,
-              onMic: voice.isLive
-                  ? conversation0.stop
-                  : () {
-                      // Saving needs a context — it shows a toast — and the
-                      // provider that builds the agent's tools has none, so the
-                      // screen hands one over. Here rather than in `build`:
-                      // reading the tools pulls in the catalogue, and a screen
-                      // that cannot be built without one is a screen that is
-                      // harder to test than it needs to be. Nothing can call
-                      // `save_patch` before the conversation it is part of.
-                      ref.read(agentToolsProvider).onSave =
-                          ({required addition, required gapIds}) =>
-                              _keepPlate(context, ref, endConversation: false);
-                      conversation0.start();
-                    },
+              onMic: onMic,
             );
 
             final thread = voice.turns.isEmpty
@@ -107,19 +117,14 @@ class VoiceAgentScreen extends ConsumerWidget {
               if (!active) {
                 return Center(child: SingleChildScrollView(child: column));
               }
-              return Column(
-                children: [
-                  // Bounded and scrollable: with a failure card in it this
-                  // column is taller than the top half of a small phone, and
-                  // an overflow there hides the microphone.
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: constraints.maxHeight * 0.58,
-                    ),
-                    child: SingleChildScrollView(child: column),
-                  ),
-                  Expanded(child: thread),
-                ],
+              // Once there is a conversation the thread takes the phone, and
+              // the plate comes down over it when it is wanted. Splitting a
+              // small screen in half gave each half too little: a plate too
+              // small to read and three messages of thread.
+              return _MobileStage(
+                voice: voice,
+                thread: thread,
+                plateSize: (constraints.maxWidth * 0.62).clamp(150.0, 260.0),
               );
             }
 
@@ -187,6 +192,9 @@ class _PlateColumn extends StatelessWidget {
         const _FavouriteBanner(),
         _Plate(size: plateSize),
         _SelectedPatch(compact: compact),
+        // Idle on a phone is the one place this line earns its space: an empty
+        // plate and a microphone, and the word for what to do with them. Once
+        // there is a conversation it goes quiet again — see _MobileStage.
         _AgentState(state: voice),
         if (voice.failure case final failure?) _Failure(message: failure),
         Padding(
@@ -198,6 +206,262 @@ class _PlateColumn extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The microphone, once it has moved up into the app bar.
+///
+/// Ringed rather than bare. Flat beside the bookmark and the cog it read as a
+/// third icon of the same kind, and the one control that is holding a live
+/// microphone open should not be the one nobody can pick out. The ring is the
+/// recording light: terracotta and filled while it is listening.
+class _AppBarMic extends StatelessWidget {
+  const _AppBarMic({required this.live, required this.onTap});
+
+  final bool live;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colour = live ? PlateColors.pro : PlateColors.green;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Space.xs),
+      child: Tooltip(
+        message: live ? 'End the conversation' : 'Start talking',
+        child: Material(
+          color: live ? PlateColors.proSoft : PlateColors.greenSoft,
+          shape: CircleBorder(side: BorderSide(color: colour, width: 2)),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: SizedBox(
+              width: 36,
+              height: 36,
+              child: Icon(
+                live ? LucideIcons.square : LucideIcons.mic,
+                size: 16,
+                color: colour,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The phone layout: the thread has the screen, the plate comes down over it.
+///
+/// A plate and a conversation do not both fit on a phone at a size where
+/// either is worth looking at. So the thread gets the screen and the plate is
+/// a sheet pulled down from the top — there when you want to see what your
+/// meal looks like, out of the way while you are talking.
+///
+/// The chevron under the sheet pulses while it is closed. The plate is the
+/// part of this app people do not expect, and a handle nobody notices is a
+/// feature nobody finds.
+class _MobileStage extends StatefulWidget {
+  const _MobileStage({
+    required this.voice,
+    required this.thread,
+    required this.plateSize,
+  });
+
+  final VoiceConversationState voice;
+  final Widget thread;
+  final double plateSize;
+
+  @override
+  State<_MobileStage> createState() => _MobileStageState();
+}
+
+class _MobileStageState extends State<_MobileStage>
+    with SingleTickerProviderStateMixin {
+  bool _open = false;
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // The sheet holds the plate, its own padding, and the handle below it.
+    final sheetHeight = widget.plateSize + Space.xl * 2;
+
+    return Stack(
+      children: [
+        // The conversation is the screen. It keeps its full height whether the
+        // plate is down or not, so opening the sheet never reflows the thread
+        // out from under someone's eye.
+        Positioned.fill(
+          child: Column(
+            children: [
+              // Whether it is listening, thinking or talking. This used to sit
+              // under the plate; with the plate behind a handle it would have
+              // gone with it, and "is this thing on?" is the one question a
+              // voice interface must always answer.
+              _AgentState(state: widget.voice, hideWhenIdle: true),
+              if (widget.voice.failure case final failure?) _Failure(message: failure),
+              Expanded(child: widget.thread),
+            ],
+          ),
+        ),
+
+        AnimatedPositioned(
+          duration: _move,
+          curve: Curves.easeOutCubic,
+          top: _open ? 0 : -sheetHeight,
+          left: 0,
+          right: 0,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            // Stretched, so the sheet is the width of the screen. Centred — the
+            // default — sizes it to the plate instead, and the conversation
+            // shows through on both sides of a panel meant to cover it.
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _PlateSheet(size: widget.plateSize, height: sheetHeight),
+              _SheetHandle(
+                open: _open,
+                pulse: _pulse,
+                onTap: () => setState(() => _open = !_open),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The plate on a phone: the picture, and the one button that acts on it.
+///
+/// No chosen-patch card here. On a wide screen it sits under the plate with
+/// room to spare; on a phone it is the difference between a plate you can see
+/// and a plate you cannot, and the same words are already in the thread.
+class _PlateSheet extends StatelessWidget {
+  const _PlateSheet({required this.size, required this.height});
+
+  final double size;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      // No panel behind it. The plate is already a round, lit object with its
+      // own edge; putting it on a card meant drawing a second edge around the
+      // first, and covering the conversation it is supposed to be sitting over.
+      child: Center(
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              _Plate(size: size),
+              // On the picture, not beside it — it acts on the plate, so it
+              // lives on the plate.
+              const Positioned(top: 0, left: 0, child: _SaveIcon()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Keeping the plate, as an icon rather than a banner.
+class _SaveIcon extends ConsumerWidget {
+  const _SaveIcon();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(chosenPatchProvider) == null) return const SizedBox.shrink();
+
+    return Material(
+      color: PlateColors.green,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: IconButton(
+        tooltip: 'Add this plate to favourite plates',
+        icon: const Icon(LucideIcons.heart, size: 18),
+        color: PlateColors.neutral100,
+        onPressed: () => _keepPlate(context, ref, endConversation: true),
+      ),
+    );
+  }
+}
+
+/// The handle under the sheet. Pulses while the plate is hidden.
+class _SheetHandle extends StatelessWidget {
+  const _SheetHandle({
+    required this.open,
+    required this.pulse,
+    required this.onTap,
+  });
+
+  final bool open;
+  final Animation<double> pulse;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final chevron = Icon(
+      open ? LucideIcons.chevronUp : LucideIcons.chevronDown,
+      size: 18,
+      color: PlateColors.neutral100,
+    );
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(top: Space.xs),
+        child: Material(
+          color: PlateColors.green,
+          borderRadius: BorderRadius.circular(kRadius),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Space.md,
+                vertical: Space.xs,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    open ? 'Hide plate' : 'See your plate',
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelLarge
+                        ?.copyWith(color: PlateColors.neutral100),
+                  ),
+                  const SizedBox(width: Space.xs),
+                  // Still while it is open: a control that blinks at someone
+                  // who has already used it is just noise.
+                  if (open)
+                    chevron
+                  else
+                    FadeTransition(
+                      opacity: Tween<double>(begin: 0.35, end: 1)
+                          .animate(CurvedAnimation(parent: pulse, curve: Curves.easeInOut)),
+                      child: chevron,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -620,12 +884,22 @@ class _PlateSkeletonState extends State<_PlateSkeleton>
 /// The one word for what is happening, readable across a room — a demo is
 /// watched, not used.
 class _AgentState extends StatelessWidget {
-  const _AgentState({required this.state});
+  const _AgentState({required this.state, this.hideWhenIdle = false});
 
   final VoiceConversationState state;
 
+  /// Says nothing at all when there is no conversation.
+  ///
+  /// Used by the phone's conversation layout, which keeps this line for what
+  /// is happening now — listening, thinking, speaking — and says nothing at
+  /// all between turns. The idle screen is the opposite case and does want it.
+  final bool hideWhenIdle;
+
   @override
   Widget build(BuildContext context) {
+    final idle = !state.isLive && !state.starting;
+    if (hideWhenIdle && idle) return const SizedBox.shrink();
+
     final (label, colour) = switch (state) {
       VoiceConversationState(starting: true) => ('Connecting…', PlateColors.inkSoft),
       VoiceConversationState(agent: VoiceAgentState.connecting) =>
@@ -725,7 +999,16 @@ class _ThreadState extends State<_Thread> {
   Widget build(BuildContext context) {
     return ListView.builder(
       controller: _controller,
-      padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.sm),
+      padding: const EdgeInsets.only(
+        left: Space.lg,
+        right: Space.lg,
+        top: Space.sm,
+        // Room under the last line. Without it the newest message sits flush
+        // against the bottom of the screen — the one message someone is
+        // actually reading, hard up against the edge, and on a phone partly
+        // under the browser's own chrome.
+        bottom: Space.xxl,
+      ),
       itemCount: widget.turns.length,
       itemBuilder: (context, i) => _Bubble(turn: widget.turns[i], index: i),
     );
