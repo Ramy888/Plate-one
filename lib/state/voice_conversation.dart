@@ -200,6 +200,28 @@ final voiceSessionFactoryProvider = Provider<VoiceSessionFactory>((ref) {
       );
 });
 
+/// Puts the agent's word deltas back together with the spaces between them.
+///
+/// `transcript.agent.delta` carries a word, and it carries it bare: no leading
+/// space, punctuation stuck to the word it follows. Concatenated as-is, every
+/// reply reads "Whatisonyourplate?" until the final transcript arrives and
+/// replaces it — which is most of the time an agent is speaking, because the
+/// partials are the part anyone is actually watching.
+///
+/// A space goes in unless there is nothing to join to, one is already there, or
+/// the next fragment is punctuation that belongs to the word before it.
+String _join(String sentence, String next) {
+  if (sentence.isEmpty || next.isEmpty) return sentence + next;
+  if (next.startsWith(RegExp(r'[\s,.;:!?%)\]}…’\u2019\u2026]')) ||
+      sentence.endsWith(' ') ||
+      // An opening bracket or an apostrophe mid-word: "don" + "'t".
+      next.startsWith("'") ||
+      sentence.endsWith('(')) {
+    return sentence + next;
+  }
+  return '$sentence $next';
+}
+
 /// Owns the session and turns its events into a thread.
 ///
 /// Autodisposed: leaving the screen ends the conversation. A microphone left
@@ -373,7 +395,10 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
 
       case AgentTranscriptDelta():
         // This one *is* the next word, so it appends.
-        _write(fromUser: false, text: _openText(fromUser: false) + event.delta);
+        _write(
+          fromUser: false,
+          text: _join(_openText(fromUser: false), event.delta),
+        );
 
       case AgentTranscript():
         _write(

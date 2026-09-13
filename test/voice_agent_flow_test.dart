@@ -256,13 +256,35 @@ void main() {
     await tapMic(tester);
 
     session.says(const ReplyStarted('r1'));
-    session.says(const AgentTranscriptDelta('What is '));
-    session.says(const AgentTranscriptDelta('on your '));
+    // Bare words, the way the wire sends them: no leading space, and the
+    // question mark stuck to the word before it. This fixture used to carry
+    // its own trailing spaces, which is why every reply read
+    // "Whatisonyourplate?" on screen while a test said otherwise.
+    session.says(const AgentTranscriptDelta('What'));
+    session.says(const AgentTranscriptDelta('is'));
+    session.says(const AgentTranscriptDelta('on'));
+    session.says(const AgentTranscriptDelta('your'));
     session.says(const AgentTranscriptDelta('plate?'));
     await tester.pump();
     await tester.pump();
 
     expect(find.text('What is on your plate?'), findsOneWidget);
+  });
+
+  testWidgets('punctuation stays attached to the word it follows', (tester) async {
+    await openHome(tester);
+    await tapMic(tester);
+
+    session.says(const ReplyStarted('r1'));
+    for (final word in ['Rice', ',', 'chicken', 'and', 'salad', '.']) {
+      session.says(AgentTranscriptDelta(word));
+    }
+    // A delta that brings its own space must not get a second one.
+    session.says(const AgentTranscriptDelta(' Good'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Rice, chicken and salad. Good'), findsOneWidget);
   });
 
   testWidgets('a settled turn stays in the thread', (tester) async {
@@ -395,8 +417,12 @@ void main() {
     // On a phone the plate is behind a handle, so the way to keep it is behind
     // the same one. The sheet is built either way — it is parked above the top
     // of the screen — so this asks where it is, not whether it exists.
+    // Past the opening peek, which puts the sheet down and takes it back up.
+    await tester.pump(const Duration(milliseconds: 2000));
+    await tester.pump(const Duration(milliseconds: 500));
+
     final save = find.byTooltip('Add this plate to favourite plates');
-    expect(tester.getTopLeft(save).dy, lessThan(0), reason: 'the sheet starts up out of sight');
+    expect(tester.getTopLeft(save).dy, lessThan(0), reason: 'the sheet parks up out of sight');
 
     await tester.tap(find.text('See your plate'));
     await tester.pump();
@@ -526,6 +552,47 @@ void main() {
     // Back to idle: the plate, the microphone, and nothing else.
     expect(find.byType(MicButton), findsOneWidget);
     expect(find.text('Describe your meal'), findsOneWidget);
+  });
+
+  testWidgets('the plate peeks out once when the conversation opens', (tester) async {
+    // The plate lives behind a handle on a phone, which makes it easy to never
+    // discover. It comes down by itself as the conversation starts, holds long
+    // enough to be read, and goes back up.
+    await openHome(tester);
+    await tapMic(tester);
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Hide plate'), findsOneWidget,
+        reason: 'the plate should show itself without being asked');
+
+    await tester.pump(const Duration(milliseconds: 1500));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('See your plate'), findsOneWidget,
+        reason: 'and then get out of the way again');
+  });
+
+  testWidgets('a peek does not fight someone who opened it themselves',
+      (tester) async {
+    await openHome(tester);
+    await tapMic(tester);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // Closed by hand while the peek is still counting down. The timer must not
+    // come along afterwards and move it again.
+    await tester.tap(find.text('Hide plate'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    await tester.tap(find.text('See your plate'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    await tester.pump(const Duration(milliseconds: 2000));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Hide plate'), findsOneWidget,
+        reason: 'left where the person put it');
   });
 
   testWidgets('saying "save it" keeps the plate, same as the button', (tester) async {

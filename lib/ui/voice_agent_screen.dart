@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -286,10 +288,43 @@ class _MobileStageState extends State<_MobileStage>
     duration: const Duration(milliseconds: 1100),
   )..repeat(reverse: true);
 
+  Timer? _peek;
+
+  /// Whether the person has worked the handle themselves. Once they have, the
+  /// app stops moving it for them — a sheet that closes itself under someone
+  /// who just opened it is the app arguing with them.
+  bool _handled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // One peek as the conversation opens: down, held long enough to read, then
+    // away. The plate is the half of this app nobody expects, and it lives
+    // behind a handle — showing it once is the difference between a feature
+    // people find and a feature people are told about.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _open = true);
+      _peek = Timer(const Duration(milliseconds: 1500), () {
+        if (!mounted || _handled) return;
+        setState(() => _open = false);
+      });
+    });
+  }
+
   @override
   void dispose() {
+    // Owned here, so leaving mid-peek cancels it rather than waking a dead
+    // widget with a setState.
+    _peek?.cancel();
     _pulse.dispose();
     super.dispose();
+  }
+
+  void _toggle() {
+    _peek?.cancel();
+    _handled = true;
+    setState(() => _open = !_open);
   }
 
   @override
@@ -336,7 +371,7 @@ class _MobileStageState extends State<_MobileStage>
               _SheetHandle(
                 open: _open,
                 pulse: _pulse,
-                onTap: () => setState(() => _open = !_open),
+                onTap: _toggle,
               ),
             ],
           ),
