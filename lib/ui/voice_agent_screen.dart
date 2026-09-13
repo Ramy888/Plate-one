@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -294,7 +295,10 @@ class _MobileStageState extends State<_MobileStage>
   @override
   Widget build(BuildContext context) {
     // The sheet holds the plate, its own padding, and the handle below it.
-    final sheetHeight = widget.plateSize + Space.xl * 2;
+    // The plate plus a little clearance under the app bar, and nothing below
+    // it: the handle hangs off the plate's own bottom edge rather than sitting
+    // in a margin of its own.
+    final sheetHeight = widget.plateSize + Space.md;
 
     return Stack(
       children: [
@@ -360,7 +364,8 @@ class _PlateSheet extends StatelessWidget {
       // No panel behind it. The plate is already a round, lit object with its
       // own edge; putting it on a card meant drawing a second edge around the
       // first, and covering the conversation it is supposed to be sitting over.
-      child: Center(
+      child: Align(
+        alignment: Alignment.bottomCenter,
         child: SizedBox(
           width: size,
           height: size,
@@ -368,9 +373,12 @@ class _PlateSheet extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               _Plate(size: size),
-              // On the picture, not beside it — it acts on the plate, so it
-              // lives on the plate.
-              const Positioned(top: 0, left: 0, child: _SaveIcon()),
+              // On the rim, not in the corner of the box around it. The plate
+              // is a circle inscribed in that box, so its top-left corner is
+              // empty space — an icon parked there reads as floating beside
+              // the plate rather than sitting on it. This is the point where
+              // the diagonal meets the edge of the circle.
+              Positioned(top: size * 0.15, left: size * 0.15, child: const _SaveIcon()),
             ],
           ),
         ),
@@ -422,8 +430,10 @@ class _SheetHandle extends StatelessWidget {
     );
 
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(top: Space.xs),
+      // Flush against the plate's lower edge — a tab on the plate, not a
+      // button that happens to be under one.
+      child: Transform.translate(
+        offset: const Offset(0, -Space.xs),
         child: Material(
           color: PlateColors.green,
           borderRadius: BorderRadius.circular(kRadius),
@@ -1130,7 +1140,14 @@ class _Options extends ConsumerWidget {
           ),
           SizedBox(
             height: 176,
-            child: ListView.separated(
+            // Draggable with a mouse, not only flicked with a trackpad.
+            // Flutter leaves PointerDeviceKind.mouse out of `dragDevices` by
+            // default, which is right for a page — text selection wins there —
+            // and wrong for a row of cards that is obviously a carousel. On a
+            // desktop browser with a mouse the row simply refused to move.
+            child: ScrollConfiguration(
+              behavior: const _DragToScroll(),
+              child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: shown.length + (turn.hasMore ? 1 : 0),
               separatorBuilder: (_, _) => const SizedBox(width: Space.sm),
@@ -1148,12 +1165,27 @@ class _Options extends ConsumerWidget {
                       ref.read(voiceConversationProvider.notifier).choose(shown[i]),
                 );
               },
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+/// Lets a mouse drag a row of cards the way a finger would.
+class _DragToScroll extends MaterialScrollBehavior {
+  const _DragToScroll();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => const {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.invertedStylus,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.mouse,
+      };
 }
 
 /// The last card in the row: one more suggestion, if none of these fit.
