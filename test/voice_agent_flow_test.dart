@@ -291,6 +291,10 @@ void main() {
       ProviderScope(
         overrides: [
           voiceSessionFactoryProvider.overrideWithValue(() => session),
+          // Starting a conversation reaches the agent's tools, and those read
+          // the catalogue. Faking the session hid that; it is real either way,
+          // since the real factory reads the same provider.
+          catalogProvider.overrideWithValue(catalog),
         ],
         child: MaterialApp(
           navigatorKey: key,
@@ -478,6 +482,49 @@ void main() {
     expect(container.read(mealDraftProvider).foodIds, isEmpty);
     // Back to idle: the plate, the microphone, and nothing else.
     expect(find.text('Describe your meal'), findsOneWidget);
+  });
+
+  testWidgets('saying "save it" keeps the plate, same as the button', (tester) async {
+    // The agent declares a `save_patch` tool. Wiring it needs a BuildContext —
+    // the save shows a toast — and the provider that builds the tools has none,
+    // so the screen has to hand one over. Left unwired the tool can only ever
+    // refuse, and the agent cheerfully offers to save and then apologises. The
+    // unit test for the tool passes either way: it supplies its own `onSave`.
+    final container = await openHome(tester);
+    await tapMic(tester);
+    container.read(mealDraftProvider.notifier).toggleFood('white_rice');
+    final offered = container.read(agentToolsProvider).recommendNow();
+    await tester.pump(const Duration(milliseconds: 500));
+    final tools = container.read(agentToolsProvider);
+
+    // Chosen by the agent, not by a tap: this is the spoken path end to end,
+    // and `choose_patch` is what puts the addition where `save_patch` looks.
+    await tools.dispatch(ToolCall(
+      callId: 'c0',
+      name: 'choose_patch',
+      arguments: {'addition_id': offered.first.addition.id},
+    ));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(tools.onSave, isNotNull, reason: 'the screen never wired save_patch');
+
+    // Through the tool, exactly as a spoken "save it" arrives.
+    final result = await tools.dispatch(const ToolCall(
+      callId: 'c1',
+      name: 'save_patch',
+      arguments: <String, dynamic>{},
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    expect((result! as Map<String, dynamic>)['saved'], isTrue);
+    expect(container.read(historyProvider), hasLength(1));
+    expect(find.textContaining('favourites'), findsOneWidget, reason: 'the toast');
+
+    // Unlike the button, this one leaves the conversation running: the agent is
+    // still mid-turn saying it saved, and stopping here cuts it off.
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(container.read(voiceConversationProvider).isLive, isTrue);
   });
 
   testWidgets('keeping the plate says so, then clears the screen', (tester) async {

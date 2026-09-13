@@ -38,6 +38,7 @@ class VoiceAgentScreen extends ConsumerWidget {
     final voice = ref.watch(voiceConversationProvider);
     final conversation0 = ref.read(voiceConversationProvider.notifier);
 
+
     return Scaffold(
       appBar: AppBar(
         titleSpacing: Space.lg,
@@ -79,7 +80,21 @@ class VoiceAgentScreen extends ConsumerWidget {
               voice: voice,
               plateSize: plateSize,
               compact: !wide,
-              onMic: voice.isLive ? conversation0.stop : conversation0.start,
+              onMic: voice.isLive
+                  ? conversation0.stop
+                  : () {
+                      // Saving needs a context — it shows a toast — and the
+                      // provider that builds the agent's tools has none, so the
+                      // screen hands one over. Here rather than in `build`:
+                      // reading the tools pulls in the catalogue, and a screen
+                      // that cannot be built without one is a screen that is
+                      // harder to test than it needs to be. Nothing can call
+                      // `save_patch` before the conversation it is part of.
+                      ref.read(agentToolsProvider).onSave =
+                          ({required addition, required gapIds}) =>
+                              _keepPlate(context, ref, endConversation: false);
+                      conversation0.start();
+                    },
             );
 
             final thread = voice.turns.isEmpty
@@ -187,6 +202,47 @@ class _PlateColumn extends StatelessWidget {
   }
 }
 
+/// Keeps the plate, from the button or from the spoken tool.
+///
+/// One path for both. "Save it" and tapping the banner mean the same thing, and
+/// a history that remembered only the ones reached by tapping would be a filing
+/// decision nobody asked for.
+///
+/// [endConversation] is the difference: the button is a deliberate full stop,
+/// so it ends the session and the plate returns to the middle. The spoken one
+/// arrives while the agent is still mid-turn — stopping there would cut it off
+/// saying "saved" — so the conversation carries on and the person ends it when
+/// they are done.
+Future<void> _keepPlate(
+  BuildContext context,
+  WidgetRef ref, {
+  required bool endConversation,
+}) async {
+  final chosen = ref.read(chosenPatchProvider);
+  if (chosen == null) return;
+
+  final result = ref.read(patchResultProvider);
+  final visual = ref.read(plateVisualProvider);
+
+  await savePatch(
+    context,
+    ref,
+    slot: result.slot,
+    foodIds: result.foods.map((f) => f.id).toList(),
+    addition: chosen.addition,
+    gapIds: result.gaps.map((g) => g.id).toList(),
+    image: visual.image,
+    // The conversation is over once the plate is kept, and the screen says so
+    // by clearing itself rather than by navigating somewhere.
+    askHowItWent: false,
+    returnToStart: false,
+  );
+  if (!context.mounted) return;
+
+  Toast.show(context, 'Saved. That plate is in your favourites.');
+  if (endConversation) await ref.read(voiceConversationProvider.notifier).stop();
+}
+
 /// Keeping the plate, offered above it once there is something to keep.
 ///
 /// Above rather than below because it is about the picture, and because the
@@ -199,32 +255,10 @@ class _FavouriteBanner extends ConsumerWidget {
     final chosen = ref.watch(chosenPatchProvider);
     if (chosen == null) return const SizedBox.shrink();
 
-    final visual = ref.watch(plateVisualProvider);
-    final result = ref.watch(patchResultProvider);
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.sm),
       child: FilledButton.icon(
-        onPressed: () async {
-          await savePatch(
-            context,
-            ref,
-            slot: result.slot,
-            foodIds: result.foods.map((f) => f.id).toList(),
-            addition: chosen.addition,
-            gapIds: result.gaps.map((g) => g.id).toList(),
-            image: visual.image,
-            // The conversation is over once the plate is kept, and the screen
-            // says so by clearing itself rather than by navigating somewhere.
-            askHowItWent: false,
-            returnToStart: false,
-          );
-          if (!context.mounted) return;
-
-          Toast.show(context, 'Saved. That plate is in your favourites.');
-
-          await ref.read(voiceConversationProvider.notifier).stop();
-        },
+        onPressed: () => _keepPlate(context, ref, endConversation: true),
         icon: const Icon(LucideIcons.heart, size: 18),
         label: const Text('Add this plate to favourite plates'),
       ),

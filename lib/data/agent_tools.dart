@@ -58,7 +58,13 @@ class AgentTools {
   final void Function(List<Patch> options)? onRecommendations;
 
   /// Keeps the patch in the history.
-  final Future<void> Function({required Addition addition, required List<String> gapIds})?
+  ///
+  /// Assigned by the screen rather than passed in, because saving needs a
+  /// `BuildContext` — it shows a toast and ends the conversation — and the
+  /// provider that builds these tools has none. Left unset, `save_patch` can
+  /// only ever refuse, which is worse than not offering the tool: the agent
+  /// says it will save and then apologises.
+  Future<void> Function({required Addition addition, required List<String> gapIds})?
       onSave;
 
   /// The ids the engine last offered. `choose_patch` accepts nothing else.
