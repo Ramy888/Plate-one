@@ -1,4 +1,4 @@
-import { spendGlobal } from './budget';
+import { refundVoice, spendGlobal, spendVoice } from './budget';
 import { authenticateDevice, quotaForDeviceRow, recordEvent } from './device';
 import { ApiError, json } from './http';
 
@@ -31,10 +31,16 @@ const EXPIRES_IN_SECONDS = 120;
 
 /**
  * The ceiling on one conversation. AssemblyAI's own default is three hours,
- * which is three hours of billing for a tab someone left open. Ten minutes is
- * far more than a conversation about a plate of food needs.
+ * which is three hours of billing for a tab someone left open.
+ *
+ * Three minutes. A plate takes well under one — describe the meal, hear the
+ * suggestion, try the other two — and this is the number the whole budget
+ * multiplies by: the audio never comes through this Worker, so session length
+ * at mint time is the only bound there is on what a conversation can cost. The
+ * client runs the same clock and ends the session itself, so reaching it looks
+ * like tapping End rather than a dropped connection.
  */
-const MAX_SESSION_SECONDS = 600;
+const MAX_SESSION_SECONDS = 180;
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -66,12 +72,20 @@ export async function postVoiceToken(request: Request, env: Env): Promise<Respon
     );
   }
 
-  // The deployment's budget first, then this device's own — a device should not
-  // be debited by a service that was never going to answer.
+  // The deployment's budgets first, then this device's own — a device should
+  // not be debited by a service that was never going to answer. The voice
+  // budget is the one denominated in somebody else's money, and it is spent
+  // before the mint rather than after, so two callers arriving together cannot
+  // both find the last session free.
   await spendGlobal(env, t);
+  await spendVoice(env, t);
 
   const spend = await stub.spend('voice', t);
   if (!spend.ok) {
+    // This caller is out, but the deployment is not: hand the day's session
+    // back so somebody else can have it. Refusing one person must not also
+    // quietly cost everybody else a conversation.
+    await refundVoice(env, t);
     throw new ApiError(
       402,
       'quota_exhausted',
@@ -109,6 +123,7 @@ export async function postVoiceToken(request: Request, env: Env): Promise<Respon
     // catch rather than a finally because the success path deliberately keeps
     // the unit spent.
     await stub.refund('voice', t);
+    await refundVoice(env, t);
     await recordEvent(
       env,
       {

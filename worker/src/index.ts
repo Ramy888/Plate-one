@@ -9,15 +9,15 @@
  * daily allowance, and the deployment as a whole carries a ceiling on top of
  * it — because this is a public demo URL with a finite budget behind it.
  */
-import { globalCap } from './budget';
+import { globalCap, voiceCap, voiceLimit } from './budget';
 import { preflight, withCors } from './cors';
 import { authenticateDevice, forgetDevice, normalizePlatform, quotaForDeviceRow, registerDevice } from './device';
 import {
   ApiError,
-  clientIp,
   errorResponse,
   json,
   noContent,
+  rateKey,
   readJson,
   requireString,
 } from './http';
@@ -66,7 +66,7 @@ async function sweep(env: Env): Promise<void> {
 // -------------------------------------------------------------------- routes
 
 async function postDevice(request: Request, env: Env): Promise<Response> {
-  await enforceLimit(env, `register:${clientIp(request)}`, 10, 3600);
+  await enforceLimit(env, `register:${rateKey(request)}`, 10, 3600);
 
   const body = await readJson(request);
   const platform = normalizePlatform(body.platform);
@@ -132,7 +132,7 @@ type Handler = (request: Request, env: Env) => Promise<Response>;
 /// call and one image. A per-IP ceiling on top of each device's own allowance,
 /// because a device id is free to mint and an IP is not.
 async function plateRoute(request: Request, env: Env): Promise<Response> {
-  await enforceLimit(env, `plate:${clientIp(request)}`, 40, 3600);
+  await enforceLimit(env, `plate:${rateKey(request)}`, 40, 3600);
   return postPlate(request, env);
 }
 
@@ -140,7 +140,7 @@ async function plateRoute(request: Request, env: Env): Promise<Response> {
 // others because a token is the cheapest thing here to ask for and the most
 // expensive thing to be handed.
 async function voiceTokenRoute(request: Request, env: Env): Promise<Response> {
-  await enforceLimit(env, `voice:${clientIp(request)}`, 20, 3600);
+  await enforceLimit(env, `voice:${rateKey(request)}`, 20, 3600);
   return postVoiceToken(request, env);
 }
 
@@ -148,7 +148,7 @@ async function voiceTokenRoute(request: Request, env: Env): Promise<Response> {
 // codes are short enough to walk through at speed, and nothing else here is
 // stopping that.
 async function promoRoute(request: Request, env: Env): Promise<Response> {
-  await enforceLimit(env, `promo:${clientIp(request)}`, 10, 3600);
+  await enforceLimit(env, `promo:${rateKey(request)}`, 10, 3600);
   return postPromo(request, env);
 }
 
@@ -180,9 +180,15 @@ async function handle(request: Request, env: Env, ctx: ExecutionContext): Promis
       // Reported honestly, so a misconfigured or exhausted deployment is
       // obvious from the outside rather than discovered by a user.
       const budget = await globalCap(env).peek(now());
+      // Conversations are the only thing here billed by the minute out of a
+      // balance that does not refill, and this is the only place anybody can
+      // see how much of today is left. Sessions, never a price: what the
+      // credits cost is nobody else's business.
+      const voice = await voiceCap(env).peek(now(), voiceLimit(env));
       return json({
         ok: true,
         budget,
+        voiceBudget: voice,
         // Whether voice can work at all, without saying anything about the key.
         voice: env.ASSEMBLYAI_API_KEY ? 'configured' : 'unconfigured',
         // What draws a plate: a caption model and an image model.

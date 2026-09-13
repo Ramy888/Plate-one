@@ -96,3 +96,27 @@ export function bearerToken(request: Request): string {
 export function clientIp(request: Request): string {
   return request.headers.get('cf-connecting-ip') ?? 'unknown';
 }
+
+/**
+ * The address a rate limit should count against.
+ *
+ * For IPv4 that is the address. For IPv6 it is the routed prefix — the first
+ * four hextets — because a single IPv6 customer is routinely handed a whole
+ * one of those and can move freely inside it. Keyed on the full address, every
+ * per-IP ceiling here is one increment of the last hextet away from being
+ * bypassed; keyed on the prefix, it costs a household nothing and an attacker
+ * their whole rotation pool.
+ *
+ * Cloudflare normalises `cf-connecting-ip`, so this only has to handle a plain
+ * address, not the `::ffff:` and bracket-and-port shapes a raw socket produces.
+ */
+export function rateKey(request: Request): string {
+  const ip = clientIp(request);
+  if (!ip.includes(':')) return ip;
+
+  // "2001:db8:1:2:3:4:5:6" -> "2001:db8:1:2::/64". A compressed address with
+  // fewer than four groups before "::" is already inside one /64.
+  const [head] = ip.split('%');
+  const groups = head.split('::')[0].split(':').filter((g) => g !== '');
+  return `${groups.slice(0, 4).join(':')}::/64`;
+}

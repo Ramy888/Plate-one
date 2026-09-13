@@ -81,11 +81,26 @@
     // long conversation does that twenty times over. The try is the unit a
     // person thinks about; this and the global cap are cost guards behind it.
     "PREVIEWS_PER_DAY": "40",
-    "VOICE_SESSIONS_PER_DAY": "30",
+    // Conversations. A token is single-use and a reconnect burns another, so
+    // this is retries as much as attempts — but it is also the number an
+    // attacker multiplies by the session cap, and thirty was a day of talking
+    // nobody does. A promo code adds ten more on top.
+    "VOICE_SESSIONS_PER_DAY": "10",
 
     // Across every device, per day. The number that actually protects the
     // budget. Lower it before sharing the URL widely; raise it for a demo.
     "GLOBAL_CALLS_PER_DAY": "2000",
+
+    // Voice, across every device, per day — counted separately because it is
+    // the only thing here billed by the minute, and by somebody else.
+    //
+    // The Voice Agent API is $4.50/hr. The Worker never learns how long a
+    // conversation actually ran — the audio goes straight from the browser to
+    // AssemblyAI — so the only bound it can enforce is sessions multiplied by
+    // the session cap in src/voice_token.ts. At 30 x 180s that is 90 minutes,
+    // or $6.75, as the most this deployment can spend in a day; a drained day
+    // recovers at midnight. Raise it when the credit balance can afford to.
+    "GLOBAL_VOICE_SESSIONS_PER_DAY": "30",
 
     // Browser origins allowed to call this API. The app's own page must be
     // here or every call fails before it is sent. Comma-separated; the

@@ -131,6 +131,36 @@ describe('device registration', () => {
     expect(a.deviceToken).not.toBe(b.deviceToken);
   });
 
+  it('counts an IPv6 caller by its /64, not its address', async () => {
+    // A single IPv6 customer is handed a whole /64 and can move freely inside
+    // it. Keyed on the full address, every limit here is one increment away
+    // from being bypassed — so this is what makes the per-IP ceilings mean
+    // anything at all on v6.
+    const inside = ['2001:db8:1:2::1', '2001:db8:1:2::2', '2001:db8:1:2:aaaa:bbbb:cccc:dddd'];
+    let limited = false;
+    for (let i = 0; i < 12 && !limited; i++) {
+      const response = await call('POST', '/v1/device', {
+        ip: inside[i % inside.length],
+        body: { platform: 'android' },
+      });
+      if (response.status === 429) limited = true;
+    }
+    expect(limited, 'addresses in one /64 were counted separately').toBe(true);
+  });
+
+  it('does not let one /64 exhaust another', async () => {
+    for (let i = 0; i < 12; i++) {
+      await call('POST', '/v1/device', { ip: '2001:db8:1:2::1', body: { platform: 'android' } });
+    }
+    // A different customer entirely. Bucketing too coarsely would refuse them
+    // for somebody else's traffic, which is the failure the /64 line avoids.
+    const other = await call('POST', '/v1/device', {
+      ip: '2001:db8:9:9::1',
+      body: { platform: 'android' },
+    });
+    expect(other.status).toBe(201);
+  });
+
   it('caps registrations from one address', async () => {
     const ip = '198.51.100.20';
     let limited = false;

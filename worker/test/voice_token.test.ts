@@ -8,8 +8,8 @@ import {
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import worker from '../src/index';
-import { globalCap, quotaForDevice } from './helpers';
-import type { QuotaCounter } from '../src/quota';
+import { globalCap, quotaForDevice, resetVoiceCap, voiceCap } from './helpers';
+import type { GlobalCap, QuotaCounter } from '../src/quota';
 
 const BASE = 'https://api.plateone.app';
 const AGENTS = 'https://agents.assemblyai.com';
@@ -64,6 +64,9 @@ beforeAll(() => {
 });
 
 beforeEach(async () => {
+  // Thirty conversations is the whole deployment's day. Without this the suite
+  // spends it on itself and every file that runs after gets a 429.
+  await resetVoiceCap();
   await env.DB.batch([
     env.DB.prepare('DELETE FROM scan_events'),
     env.DB.prepare('DELETE FROM devices'),
@@ -89,8 +92,11 @@ describe('minting a voice token', () => {
     };
     expect(body.token).toBe('aai_temp_abc');
     expect(body.expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
-    // Three hours is AssemblyAI's default; a tab left open must not bill for it.
-    expect(body.maxSessionSeconds).toBeLessThanOrEqual(600);
+    // Three hours is AssemblyAI's default; a tab left open must not bill for
+    // it. This is also the number the day's budget multiplies by — the audio
+    // never comes through the Worker, so nothing downstream of here can bound
+    // what a conversation costs.
+    expect(body.maxSessionSeconds).toBeLessThanOrEqual(180);
     expect(body.quota.voice).toBe(Number(env.VOICE_SESSIONS_PER_DAY) - 1);
   });
 
@@ -253,5 +259,62 @@ describe('the free try gates the microphone', () => {
     );
 
     expect(after.voice).toBe(before.voice);
+  });
+});
+
+describe('the deployment’s voice budget', () => {
+  const limit = () => Number(env.GLOBAL_VOICE_SESSIONS_PER_DAY);
+  const used = async () =>
+    (await runInDurableObject(voiceCap(), (cap: GlobalCap) =>
+      cap.peek(Math.floor(Date.now() / 1000), limit()))).used;
+
+  it('refuses everyone once the day’s conversations are gone', async () => {
+    // This is the number that stands between a public demo URL and an empty
+    // credit balance: the Worker never sees how long a conversation ran, so
+    // sessions multiplied by the session cap is the only bound on the bill.
+    await runInDurableObject(voiceCap(), async (cap: GlobalCap) => {
+      const t = Math.floor(Date.now() / 1000);
+      for (let i = 0; i < limit(); i++) await cap.spend(t, limit());
+    });
+
+    const token = await register();
+    // No interceptor: reaching AssemblyAI at all would fail the run under
+    // disableNetConnect, which is the point — the refusal happens before it.
+    const response = await send('/v1/voice/token', { token });
+
+    expect(response.status).toBe(429);
+    const body = (await response.json()) as { error: string; message: string };
+    expect(body.error).toBe('service_busy');
+    // Says what still works. A dead end here is a judge closing the tab.
+    expect(body.message).toContain('Tapping the meal');
+  });
+
+  it('does not spend the day’s budget when the mint fails', async () => {
+    interceptToken({ error: 'upstream is having a bad minute' }, 503);
+    const token = await register();
+    const before = await used();
+
+    const response = await send('/v1/voice/token', { token });
+    expect(response.status).toBe(503);
+
+    // An AssemblyAI blip barely showed against a limit of two thousand. Against
+    // thirty it is the whole afternoon, spent on conversations nobody had.
+    expect(await used(), 'a failed mint still cost the deployment a session')
+      .toBe(before);
+  });
+
+  it('hands the session back when the caller is the one out of allowance', async () => {
+    const token = await register();
+    await runInDurableObject(await quotaForDevice(token), async (q: QuotaCounter) => {
+      const t = Math.floor(Date.now() / 1000);
+      for (let i = 0; i < Number(env.VOICE_SESSIONS_PER_DAY); i++) await q.spend('voice', t);
+    });
+    const before = await used();
+
+    const response = await send('/v1/voice/token', { token });
+    expect(response.status).toBe(402);
+
+    // Refusing one person must not quietly cost everybody else a conversation.
+    expect(await used()).toBe(before);
   });
 });

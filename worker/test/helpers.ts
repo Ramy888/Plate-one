@@ -1,4 +1,6 @@
-import { env } from 'cloudflare:test';
+import { env, runInDurableObject } from 'cloudflare:test';
+
+import type { GlobalCap } from '../src/quota';
 
 /**
  * The Durable Object holding a device's allowance.
@@ -27,6 +29,26 @@ export async function quotaForDevice(deviceToken: string) {
  */
 export function globalCap() {
   return env.GLOBAL_CAP.get(env.GLOBAL_CAP.idFromName('all'));
+}
+
+/**
+ * The deployment's daily *voice* budget — the instance `spendVoice` spends.
+ *
+ * Unlike [globalCap] this one is small enough that an ordinary suite drains it
+ * by accident: every successful mint takes one of thirty, and storage isolation
+ * is off. [resetVoiceCap] is therefore a `beforeEach`, not a convenience.
+ */
+export function voiceCap() {
+  return env.GLOBAL_CAP.get(env.GLOBAL_CAP.idFromName('voice'));
+}
+
+/** Puts today's voice budget back, so one suite cannot starve the next. */
+export async function resetVoiceCap() {
+  // Through the state the test runner hands over, not `instance.ctx` — that one
+  // is protected, and reaching into it compiles only by accident.
+  await runInDurableObject(voiceCap(), async (_instance: GlobalCap, state) => {
+    await state.storage.deleteAll();
+  });
 }
 
 /** A throwaway budget, for tests that need to spend one to the end. */

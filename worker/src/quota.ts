@@ -56,7 +56,7 @@ const DAY = 24 * 60 * 60;
 /** Daily caps per device. A spend ceiling, not a monetisation lever. */
 export const PLATES_PER_DAY = 1;
 export const PREVIEWS_PER_DAY = 40;
-export const VOICE_SESSIONS_PER_DAY = 30;
+export const VOICE_SESSIONS_PER_DAY = 10;
 
 /** The things that cost money, and the only things counted here. */
 export type Spend = 'plate' | 'preview' | 'voice';
@@ -200,19 +200,32 @@ export class QuotaCounter extends DurableObject<Env> {
  * standing between a public demo URL and an empty API account, so it is
  * deliberately dumb: a count, a day, and a hard stop.
  */
+/**
+ * A daily ceiling across every device.
+ *
+ * One instance per budget, named by [globalCap] and [voiceCap]: `all` counts
+ * everything that costs money, `voice` counts conversations on their own. The
+ * limit is a parameter rather than a field because a Durable Object cannot read
+ * the name it was addressed by, so the caller — which does know — passes it in.
+ */
 export class GlobalCap extends DurableObject<Env> {
   private get perDay(): number {
     return Number(this.env.GLOBAL_CALLS_PER_DAY ?? 2000);
   }
 
-  /** Spends one unit of the global budget. False means the deployment is done for today. */
-  async spend(now: number): Promise<{ ok: boolean; used: number; limit: number; resetsAt: number }> {
+  private async read(now: number): Promise<{ used: number; windowStart: number }> {
     const stored = (await this.ctx.storage.get<{ used: number; windowStart: number }>('state')) ??
       { used: 0, windowStart: 0 };
-
     const fresh = stored.windowStart === 0 || now - stored.windowStart >= DAY;
-    const state = fresh ? { used: 0, windowStart: now } : stored;
-    const limit = this.perDay;
+    return fresh ? { used: 0, windowStart: now } : stored;
+  }
+
+  /** Spends one unit of the global budget. False means the deployment is done for today. */
+  async spend(
+    now: number,
+    limit = this.perDay,
+  ): Promise<{ ok: boolean; used: number; limit: number; resetsAt: number }> {
+    const state = await this.read(now);
 
     if (state.used >= limit) {
       return { ok: false, used: state.used, limit, resetsAt: state.windowStart + DAY };
@@ -223,11 +236,26 @@ export class GlobalCap extends DurableObject<Env> {
     return { ok: true, used: next.used, limit, resetsAt: next.windowStart + DAY };
   }
 
-  async peek(now: number): Promise<{ used: number; limit: number; resetsAt: number }> {
-    const stored = (await this.ctx.storage.get<{ used: number; windowStart: number }>('state')) ??
-      { used: 0, windowStart: 0 };
-    const fresh = stored.windowStart === 0 || now - stored.windowStart >= DAY;
-    const state = fresh ? { used: 0, windowStart: now } : stored;
-    return { used: state.used, limit: this.perDay, resetsAt: state.windowStart + DAY };
+  /**
+   * Gives one back, for a call that was charged and then did not happen.
+   *
+   * Without this an upstream that is merely having a bad minute spends the
+   * day's budget on nothing — which barely showed at a limit of two thousand
+   * and is the whole afternoon at a limit of thirty.
+   */
+  async refund(now: number): Promise<void> {
+    const state = await this.read(now);
+    // Never below zero: a refund must not be able to mint budget that was
+    // never spent, and a day that rolled over between the spend and the
+    // refund has already forgotten it.
+    await this.ctx.storage.put('state', { ...state, used: Math.max(0, state.used - 1) });
+  }
+
+  async peek(
+    now: number,
+    limit = this.perDay,
+  ): Promise<{ used: number; limit: number; resetsAt: number }> {
+    const state = await this.read(now);
+    return { used: state.used, limit, resetsAt: state.windowStart + DAY };
   }
 }
