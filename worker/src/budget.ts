@@ -30,7 +30,7 @@ export function voiceCap(env: Env): DurableObjectStub<GlobalCap> {
 
 /** How many conversations this deployment will start in a day, across everyone. */
 export function voiceLimit(env: Env): number {
-  return Number(env.GLOBAL_VOICE_SESSIONS_PER_DAY ?? 30);
+  return Number(env.GLOBAL_VOICE_SESSIONS_PER_DAY ?? 100);
 }
 
 /** Spends one unit of the deployment's daily budget, or refuses in plain words. */

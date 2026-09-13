@@ -97,10 +97,15 @@
     // The Voice Agent API is $4.50/hr. The Worker never learns how long a
     // conversation actually ran — the audio goes straight from the browser to
     // AssemblyAI — so the only bound it can enforce is sessions multiplied by
-    // the session cap in src/voice_token.ts. At 30 x 180s that is 90 minutes,
-    // or $6.75, as the most this deployment can spend in a day; a drained day
-    // recovers at midnight. Raise it when the credit balance can afford to.
-    "GLOBAL_VOICE_SESSIONS_PER_DAY": "30",
+    // the session cap in src/voice_token.ts.
+    //
+    // At 100 x 180s that is five hours, or $22.50, as the most this deployment
+    // can spend in a day. Set deliberately high for the judging window: the
+    // balance is finite, so this is roughly two fully-drained days — but a
+    // visitor turned away is a judge who never saw the thing work, and that
+    // costs more than the credits do. Watch /health -> voiceBudget; lower it
+    // once judging is over.
+    "GLOBAL_VOICE_SESSIONS_PER_DAY": "100",
 
     // Browser origins allowed to call this API. The app's own page must be
     // here or every call fails before it is sent. Comma-separated; the

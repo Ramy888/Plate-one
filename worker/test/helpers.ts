@@ -35,7 +35,7 @@ export function globalCap() {
  * The deployment's daily *voice* budget — the instance `spendVoice` spends.
  *
  * Unlike [globalCap] this one is small enough that an ordinary suite drains it
- * by accident: every successful mint takes one of thirty, and storage isolation
+ * by accident: every successful mint takes one of the day's, and isolation
  * is off. [resetVoiceCap] is therefore a `beforeEach`, not a convenience.
  */
 export function voiceCap() {
