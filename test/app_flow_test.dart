@@ -17,6 +17,7 @@ import 'package:plateone/ui/food_picker_screen.dart';
 import 'package:plateone/ui/voice_agent_screen.dart';
 import 'package:plateone/ui/onboarding_screen.dart';
 import 'package:plateone/ui/widgets/plate_fill.dart';
+import 'package:plateone/ui/widgets/plate_fill_video.dart';
 import 'package:plateone/ui/saved_screen.dart';
 import 'package:plateone/ui/settings_screen.dart';
 import 'package:plateone/ui/theme.dart';
@@ -206,11 +207,12 @@ void main() {
     // The first page is the plate filling itself. It used to be a three-beat
     // walkthrough whose own copy said "tap what is on your plate" — a tour of
     // the tapping flow, on the first screen of a voice-first app.
+    expect(find.byType(PlateFillVideo), findsOneWidget);
+    // These tests run with animations disabled, which is also the path someone
+    // who asked their system for less motion takes — and the path taken when
+    // the browser refuses to play the film at all. Either way the plate is
+    // drawn instead, so the first screen of the app is never empty.
     expect(find.byType(PlateFill), findsOneWidget);
-    // Under reduced motion it draws the finished plate rather than looping, so
-    // these tests can settle and nobody who asked for less motion gets a plate
-    // that never stops.
-    expect(tester.widget<PlateFill>(find.byType(PlateFill)).size, greaterThan(0));
 
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();

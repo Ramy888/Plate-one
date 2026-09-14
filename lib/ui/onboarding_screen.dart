@@ -5,7 +5,7 @@ import '../domain/models.dart';
 import '../state/providers.dart';
 import 'theme.dart';
 import 'widgets/common.dart';
-import 'widgets/plate_fill.dart';
+import 'widgets/plate_fill_video.dart';
 
 /// Welcome, goal, preferences — three steps, no account, no questions about
 /// weight or calories. The whole point is that nothing here feels like a form.
@@ -146,7 +146,7 @@ class _WelcomePage extends StatelessWidget {
           'That is the whole app.',
       children: const [
         SizedBox(height: Space.lg),
-        Center(child: PlateFill(size: 240)),
+        Center(child: PlateFillVideo(size: 210)),
       ],
     );
   }

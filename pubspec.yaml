@@ -21,6 +21,7 @@ dependencies:
   record: ^6.2.1
   path_provider: ^2.1.6
   web: ^1.1.1
+  video_player: ^2.11.1
 
 dev_dependencies:
   # Only the voice session test needs it, to stand in for a WebSocket.
@@ -38,6 +39,8 @@ flutter:
     # layers are build inputs for the launcher, not runtime assets.
     - assets/icon/icon.png
     - assets/meals/
+    # The onboarding film: a plate filling with a meal. Four seconds, silent.
+    - assets/onboarding/
 
   # Caprasimo for display, Figtree for everything else — the Organic design
   # system's pairing. Bundled rather than fetched so the app renders the same
