@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -1321,14 +1320,7 @@ class _Options extends ConsumerWidget {
           ),
           SizedBox(
             height: 176,
-            // Draggable with a mouse, not only flicked with a trackpad.
-            // Flutter leaves PointerDeviceKind.mouse out of `dragDevices` by
-            // default, which is right for a page — text selection wins there —
-            // and wrong for a row of cards that is obviously a carousel. On a
-            // desktop browser with a mouse the row simply refused to move.
-            child: ScrollConfiguration(
-              behavior: const _DragToScroll(),
-              child: ListView.separated(
+            child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: shown.length + (turn.hasMore ? 1 : 0),
               separatorBuilder: (_, _) => const SizedBox(width: Space.sm),
@@ -1346,27 +1338,12 @@ class _Options extends ConsumerWidget {
                       ref.read(voiceConversationProvider.notifier).choose(shown[i]),
                 );
               },
-              ),
             ),
           ),
         ],
       ),
     );
   }
-}
-
-/// Lets a mouse drag a row of cards the way a finger would.
-class _DragToScroll extends MaterialScrollBehavior {
-  const _DragToScroll();
-
-  @override
-  Set<PointerDeviceKind> get dragDevices => const {
-        PointerDeviceKind.touch,
-        PointerDeviceKind.stylus,
-        PointerDeviceKind.invertedStylus,
-        PointerDeviceKind.trackpad,
-        PointerDeviceKind.mouse,
-      };
 }
 
 /// The last card in the row: one more suggestion, if none of these fit.

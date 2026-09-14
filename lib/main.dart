@@ -33,6 +33,8 @@ class PlateOneApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      // Every list in the app drags with a mouse, not only with a finger.
+      scrollBehavior: const DragScrollBehavior(),
       title: 'Plate One',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),

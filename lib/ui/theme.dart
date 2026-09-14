@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 /// Plate One's look, ported from the "Organic" design system.
@@ -220,4 +221,24 @@ ThemeData buildTheme() {
       space: 1,
     ),
   );
+}
+
+/// Lets a mouse drag any scrollable, the way a finger would.
+///
+/// Flutter leaves [PointerDeviceKind.mouse] out of `dragDevices` by default,
+/// which is the right call for a document — dragging there should select text.
+/// This app has no selectable text and is used in a browser as much as on a
+/// phone, so every list here was refusing the one gesture a person with a mouse
+/// actually tries. The wheel worked; nothing else did.
+class DragScrollBehavior extends MaterialScrollBehavior {
+  const DragScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => const {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.invertedStylus,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.mouse,
+      };
 }

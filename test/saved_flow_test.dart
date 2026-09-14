@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +12,7 @@ import 'package:plateone/data/patch_images.dart';
 import 'package:plateone/data/prefs_repository.dart';
 import 'package:plateone/domain/models.dart';
 import 'package:plateone/state/providers.dart';
+import 'package:plateone/main.dart';
 import 'package:plateone/ui/saved_screen.dart';
 import 'package:plateone/ui/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -83,7 +85,13 @@ Future<(ProviderContainer, MemoryPatchImages)> _pump(
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
-      child: MaterialApp(theme: buildTheme(), home: const SavedScreen()),
+      // Mirrors PlateOneApp. The drift is guarded by the test below, which
+      // checks the real app still sets it.
+      child: MaterialApp(
+        scrollBehavior: const DragScrollBehavior(),
+        theme: buildTheme(),
+        home: const SavedScreen(),
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -186,5 +194,55 @@ void main() {
     await container.read(historyProvider.notifier).clear();
 
     expect(await store.get('sp1.jpg'), isNull);
+  });
+
+  testWidgets('a long list drags with a mouse, not just the wheel', (tester) async {
+    // Flutter leaves the mouse out of `dragDevices`, so in a browser the wheel
+    // scrolled and dragging did nothing at all — which is the gesture people
+    // reach for first when a page looks like it has more below the fold.
+    tester.view.physicalSize = const Size(390 * 3, 700 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+
+    await _pump(
+      tester,
+      history: [for (var i = 0; i < 24; i++) _patch(id: 'sp$i')],
+    );
+
+    final list = find.byType(Scrollable).last;
+    // The position, not the controller: this ListView was never given one, and
+    // `controller?.offset ?? 0` quietly compares zero with zero forever.
+    double offset() => tester.state<ScrollableState>(list).position.pixels;
+    expect(tester.state<ScrollableState>(list).position.maxScrollExtent,
+        greaterThan(0), reason: 'the fixture has to be taller than the screen');
+
+    await tester.drag(
+      find.byType(ListView).last,
+      const Offset(0, -260),
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pumpAndSettle();
+
+    expect(offset(), greaterThan(0), reason: 'a mouse drag moved nothing');
+  });
+
+  testWidgets('the app itself lets a mouse drag its lists', (tester) async {
+    // The harness above sets this by hand, so without this the suite would go
+    // on passing after somebody removed it from the app.
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          prefsRepositoryProvider.overrideWithValue(
+            PrefsRepository(await SharedPreferences.getInstance()),
+          ),
+          catalogProvider.overrideWithValue(_realCatalog()),
+        ],
+        child: const PlateOneApp(),
+      ),
+    );
+    await tester.pump();
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.scrollBehavior, isA<DragScrollBehavior>());
   });
 }
