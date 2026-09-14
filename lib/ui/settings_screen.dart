@@ -5,7 +5,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../domain/models.dart';
 import '../state/providers.dart';
-import '../data/api.dart';
 import '../state/api_providers.dart';
 import 'legal_screen.dart';
 import 'theme.dart';
@@ -72,8 +71,6 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: Space.sm),
             _LinkRow(label: 'Terms of use', onTap: () => LegalScreen.showTerms(context)),
             const _SectionHeading('Your data'),
-            const _VoiceAllowance(),
-            const SizedBox(height: Space.sm),
             const _DeleteMyData(),
             const SizedBox(height: Space.lg),
             const _VersionLine(),
@@ -124,62 +121,6 @@ class _LinkRow extends StatelessWidget {
         children: [
           Expanded(child: Text(label, style: Theme.of(context).textTheme.titleMedium)),
           const Icon(LucideIcons.chevronRight, color: PlateColors.inkSoft),
-        ],
-      ),
-    );
-  }
-}
-
-/// How many conversations are left, without spending one to find out.
-class _VoiceAllowance extends ConsumerStatefulWidget {
-  const _VoiceAllowance();
-
-  @override
-  ConsumerState<_VoiceAllowance> createState() => _VoiceAllowanceState();
-}
-
-class _VoiceAllowanceState extends ConsumerState<_VoiceAllowance> {
-  @override
-  void initState() {
-    super.initState();
-    // Ask, rather than waiting to be told. Nothing else on this screen makes a
-    // call, so without this the card says "start a conversation" to someone who
-    // has had six — the number only ever arrived as a side effect of spending
-    // one, and it does not survive a reload.
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => ref.read(deviceProvider.notifier).refreshQuota(),
-    );
-  }
-
-  static String _describe(Allowance? quota) {
-    if (quota == null) return 'Loading…';
-    if (!quota.hasTry) {
-      return 'Used. A promo code opens another, and building a meal by hand is '
-          'unlimited — today and always.';
-    }
-    final plural = quota.plates == 1 ? 'plate' : 'plates';
-    return '${quota.plates} $plural left today${quota.bonus ? ' (a code opened these)' : ''}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final quota = ref.watch(deviceProvider).quota;
-    return PlateCard(
-      padding: const EdgeInsets.all(Space.md),
-      child: Row(
-        children: [
-          const Lead(LucideIcons.mic),
-          const SizedBox(width: Space.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Free plates today', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 2),
-                Text(_describe(quota), style: Theme.of(context).textTheme.bodyMedium),
-              ],
-            ),
-          ),
         ],
       ),
     );

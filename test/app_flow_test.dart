@@ -371,6 +371,27 @@ void main() {
     }
   });
 
+  group('the day\'s allowance', () {
+    testWidgets('it is asked for, not waited for', (tester) async {
+      // It used to arrive only as a side effect of spending one, and it did not
+      // survive a reload — so the count could tell someone who had held six
+      // conversations that they had never started. This lived on a settings
+      // card once; it is the app bar's count now, which is the screen people
+      // are actually looking at when it matters.
+      final api = _QuotaApi();
+      await _pumpApp(
+        tester,
+        prefs: {'onboarded': true, 'device_token': 'device-token'},
+        home: const VoiceAgentScreen(),
+        api: api,
+      );
+      await tester.pumpAndSettle();
+
+      expect(api.asked, 1);
+      expect(find.byTooltip('2 plates left today'), findsOneWidget);
+    });
+  });
+
   group('saved patches', () {
     List<String> makeHistory(int count) => [
           for (var i = 0; i < count; i++)
@@ -449,23 +470,6 @@ void main() {
   });
 
   group('settings', () {
-    testWidgets('the allowance is asked for, not waited for', (tester) async {
-      // It used to arrive only as a side effect of spending one, and it did not
-      // survive a reload — so this card told someone who had held six
-      // conversations to start their first.
-      final api = _QuotaApi();
-      await _pumpApp(
-        tester,
-        prefs: {'onboarded': true, 'device_token': 'device-token'},
-        home: const SettingsScreen(),
-        api: api,
-      );
-      await tester.pumpAndSettle();
-
-      expect(api.asked, 1);
-      expect(find.text('2 plates left today'), findsOneWidget);
-      expect(find.text('Loading…'), findsNothing);
-    });
 
     testWidgets('a goal chosen at onboarding can be changed later',
         (tester) async {
