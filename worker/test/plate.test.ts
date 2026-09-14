@@ -69,6 +69,18 @@ function interceptCaption(reply: string, times = 1) {
     .times(times);
 }
 
+/**
+ * The caption model refusing. 403 and 429 are what a billing block or a spent
+ * quota actually look like from here; 422 is a content refusal.
+ */
+function interceptCaptionFailure(status: number, times = 1) {
+  fetchMock
+    .get(GEMINI)
+    .intercept({ path: (p) => p.includes(':generateContent'), method: 'POST' })
+    .reply(status, { error: { message: 'nope' } })
+    .times(times);
+}
+
 /** One tiny JPEG, base64, as Flux would return it. */
 const FAKE_IMAGE_B64 = btoa(String.fromCharCode(0xff, 0xd8, 0xff, 0xd9));
 
@@ -429,5 +441,43 @@ describe('the free try', () => {
     );
     expect(redeemed.status).toBe(200);
     expect(((await redeemed.json()) as { quota: { plates: number } }).quota.plates).toBe(5);
+  });
+
+  it('still draws the plate when the caption model is down', async () => {
+    // These are two different services and only one of them draws anything.
+    // This route used to answer 503 whenever the writing model failed, so a
+    // billing block on it meant nobody could see their meal at all — and the
+    // agent says the sentence out loud regardless.
+    const images = stubImages();
+    interceptCaptionFailure(403);
+    const token = await register();
+
+    const response = await send(plateRequest(token, {
+      foodIds: ['white_rice', 'chicken'],
+      additionId: 'hummus',
+    }));
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { imageUrl: string | null; reply: string };
+    expect(body.imageUrl, 'the picture is the part people wait for').toBeTruthy();
+    expect(body.reply).toBe('');
+    expect(images.prompts).toHaveLength(1);
+    images.restore();
+  });
+
+  it('still refuses a plate the caption model rejected on content', async () => {
+    // A refusal is not an outage. Drawing it anyway would be going around it.
+    const images = stubImages();
+    interceptCaptionFailure(422);
+    const token = await register();
+
+    const response = await send(plateRequest(token, {
+      foodIds: ['white_rice', 'chicken'],
+      additionId: 'hummus',
+    }));
+
+    expect(response.status).toBe(422);
+    expect(images.prompts, 'nothing should have been drawn').toHaveLength(0);
+    images.restore();
   });
 });

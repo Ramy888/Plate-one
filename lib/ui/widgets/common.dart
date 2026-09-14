@@ -684,3 +684,94 @@ class Section extends StatelessWidget {
     );
   }
 }
+
+/// The plate itself: rim, well, and the light that makes it read as a dish.
+///
+/// Extracted so the voice screen and the onboarding intro draw the same object.
+/// It was duplicated once and the copy drifted within a day — the lighting here
+/// is fiddly enough that nobody re-derives it correctly from memory.
+///
+/// [child] sits *in* the well, clipped to it and inset by the rim, so the rim
+/// stays a rim even when the plate is full.
+class PlateDish extends StatelessWidget {
+  const PlateDish({super.key, required this.size, this.child});
+
+  final double size;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    // A plate seen from above, lit from the upper left. Four layers, which is
+    // what it takes for a circle to read as a dish rather than as a circle:
+    // the shadow it casts, the rim, the well the food sits in, and the sheen.
+    final rim = size * 0.085;
+
+    return SizedBox(
+      height: size,
+      width: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          // The rim catches the light on one side and turns away from it on the
+          // other. A flat fill here is what made it look printed on.
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFFFDF8), PlateColors.neutral300],
+            stops: [0.15, 1.0],
+          ),
+          boxShadow: [
+            // Contact: tight and close, where the plate meets the table.
+            BoxShadow(
+              color: PlateColors.ink.withValues(alpha: 0.16),
+              blurRadius: size * 0.06,
+              offset: Offset(0, size * 0.02),
+            ),
+            // Cast: wide and soft, which is what gives the height.
+            BoxShadow(
+              color: PlateColors.ink.withValues(alpha: 0.09),
+              blurRadius: size * 0.13,
+              offset: Offset(0, size * 0.06),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(rim),
+          // The step down from rim to well. Without a hard edge here the two
+          // gradients blend and the whole thing goes soft again.
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: PlateColors.ink.withValues(alpha: 0.07),
+                width: 1.2,
+              ),
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // The well is lit from the *opposite* side to the rim, and that
+                // inversion is the whole trick: on a dish the near wall turns
+                // away from the light and the far wall catches it, so a rim
+                // bright at the top-left over a well bright at the bottom-right
+                // reads as hollow. Matching them reads as a dome.
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      center: Alignment(0.45, 0.55),
+                      radius: 1.1,
+                      colors: [Color(0xFFFFFDF8), PlateColors.neutral300],
+                      stops: [0.0, 1.0],
+                    ),
+                  ),
+                ),
+                if (child case final contents?) ClipOval(child: contents),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

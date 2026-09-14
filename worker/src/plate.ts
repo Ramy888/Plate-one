@@ -125,7 +125,6 @@ export async function postPlate(request: Request, env: Env): Promise<Response> {
         prompt,
       });
     } catch (error) {
-      await stub.refund('preview', t);
       await recordEvent(
         env,
         {
@@ -137,10 +136,25 @@ export async function postPlate(request: Request, env: Env): Promise<Response> {
         },
         t,
       );
+
+      // Refused on content, not broken: the plate itself was rejected, so
+      // drawing it anyway would be going around the refusal.
       if (error instanceof GeminiError && error.status === 422) {
+        await stub.refund('preview', t);
         throw new ApiError(422, 'plate_blocked', 'That plate could not be written up.');
       }
-      throw new ApiError(503, 'plate_unavailable', 'Busy right now. Try again shortly.');
+
+      // Anything else — the caption model being down, out of quota, or having a
+      // bad minute — must not take the picture with it. The two are separate
+      // services and only one of them draws the plate. This route used to
+      // answer 503 in that case, so a billing problem on the writing model
+      // meant nobody could see their meal at all; the agent says the sentence
+      // out loud anyway, and the picture is the part people are waiting for.
+      console.error(JSON.stringify({
+        event: 'plate_caption_failed',
+        message: error instanceof Error ? error.message.slice(0, 120) : 'unknown',
+      }));
+      result = { reply: '' } as PlateReply;
     }
     reply = String(result.reply ?? '').slice(0, 800);
   }

@@ -16,6 +16,7 @@ import 'package:plateone/state/providers.dart';
 import 'package:plateone/ui/food_picker_screen.dart';
 import 'package:plateone/ui/voice_agent_screen.dart';
 import 'package:plateone/ui/onboarding_screen.dart';
+import 'package:plateone/ui/widgets/plate_fill.dart';
 import 'package:plateone/ui/saved_screen.dart';
 import 'package:plateone/ui/settings_screen.dart';
 import 'package:plateone/ui/theme.dart';
@@ -202,20 +203,14 @@ void main() {
       (tester) async {
     final container = await _pumpApp(tester);
 
-    // The first page is the walkthrough. It loops, so the reduced-motion path
-    // these tests run under has to lay all three beats out at once — and if it
-    // did not fit, the overflow would fail this test rather than ship.
-    for (final beat in [
-      'Tap what is on your plate',
-      'It finds the one gap',
-      'Add one thing',
-    ]) {
-      expect(find.text(beat), findsOneWidget);
-    }
-    // Drawn with the app's own parts, so the walkthrough cannot describe a
-    // picker that no longer looks like that.
-    expect(find.text('Rice'), findsOneWidget);
-    expect(find.text('Add a side salad'), findsOneWidget);
+    // The first page is the plate filling itself. It used to be a three-beat
+    // walkthrough whose own copy said "tap what is on your plate" — a tour of
+    // the tapping flow, on the first screen of a voice-first app.
+    expect(find.byType(PlateFill), findsOneWidget);
+    // Under reduced motion it draws the finished plate rather than looping, so
+    // these tests can settle and nobody who asked for less motion gets a plate
+    // that never stops.
+    expect(tester.widget<PlateFill>(find.byType(PlateFill)).size, greaterThan(0));
 
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
