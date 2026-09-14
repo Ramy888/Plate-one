@@ -350,6 +350,8 @@ void main() {
           // the catalogue. Faking the session hid that; it is real either way,
           // since the real factory reads the same provider.
           catalogProvider.overrideWithValue(catalog),
+          // The app bar counts the plates left, which means reading the device.
+          prefsRepositoryProvider.overrideWithValue(await _prefs()),
         ],
         child: MaterialApp(
           navigatorKey: key,
@@ -591,6 +593,59 @@ void main() {
     // Back to idle: the plate, the microphone, and nothing else.
     expect(find.byType(MicButton), findsOneWidget);
     expect(find.text('Describe your meal'), findsOneWidget);
+  });
+
+  testWidgets('the app bar says how many plates are left', (tester) async {
+    // Running out is the one thing that stops this app working — the
+    // microphone will not open without a plate — and it used to be invisible
+    // until the moment it bit.
+    final container = await openHome(tester);
+    container.read(deviceProvider.notifier).noteQuota(
+          Allowance(
+            plates: 7,
+            previews: 9,
+            voice: 9,
+            resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
+          ),
+        );
+    await tester.pump();
+
+    expect(find.text('7'), findsOneWidget);
+    expect(find.byTooltip('7 plates left today'), findsOneWidget);
+  });
+
+  testWidgets('the count appears as soon as the device registers', (tester) async {
+    // The path production actually takes: nothing is known until the first
+    // call, and registering is what first reports an allowance.
+    final container = await openHome(tester);
+    expect(find.byTooltip('1 plate left today'), findsNothing);
+
+    await container.read(deviceProvider.notifier).token();
+    await tester.pump();
+
+    expect(find.byTooltip('1 plate left today'), findsOneWidget);
+  });
+
+  testWidgets('an empty count says where more come from', (tester) async {
+    final container = await openHome(tester);
+    container.read(deviceProvider.notifier).noteQuota(
+          Allowance(
+            plates: 0,
+            previews: 9,
+            voice: 9,
+            resetsAt: DateTime.fromMillisecondsSinceEpoch(0),
+          ),
+        );
+    await tester.pump();
+
+    expect(find.byTooltip('No plates left today. A promo code opens more.'),
+        findsOneWidget);
+
+    // And it is the way back in, not just a readout.
+    await tester.tap(find.text('0'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Have a promo code?'), findsOneWidget);
   });
 
   testWidgets('the plate peeks out once when the conversation opens', (tester) async {

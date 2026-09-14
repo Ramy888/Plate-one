@@ -69,7 +69,12 @@ class PatchEngine {
       if (score > 0) scored[a] = score;
     }
 
-    final rounds = _rounds(scored, gaps, severity);
+    // What this particular plate is, in one number. Two plates that are
+    // nutritionally identical still get different orderings out of it, which is
+    // what stops the same card leading every single meal.
+    final seed = _seed(slot, foods);
+
+    final rounds = _rounds(scored, gaps, severity, seed);
 
     return PatchResult(
       slot: slot,
@@ -181,13 +186,14 @@ class PatchEngine {
     Map<Addition, double> scored,
     List<Nutrient> gaps,
     Map<Nutrient, int> severity,
+    int seed,
   ) {
     if (scored.isEmpty) return const [];
 
     final taken = <String>{};
     final rounds = <List<Patch>>[];
     for (var round = 0; round < _maxRounds; round++) {
-      final picks = _pick(scored, gaps, severity, taken);
+      final picks = _pick(scored, gaps, severity, taken, seed);
       if (picks.isEmpty) break;
       rounds.add(picks);
     }
@@ -202,6 +208,7 @@ class PatchEngine {
     List<Nutrient> gaps,
     Map<Nutrient, int> severity,
     Set<String> taken,
+    int seed,
   ) {
     final patches = <Patch>[];
 
@@ -214,7 +221,7 @@ class PatchEngine {
         return true;
       }).toList();
 
-      final chosen = _best(pool, scored, angle);
+      final chosen = _best(pool, scored, angle, seed);
       if (chosen == null) continue;
 
       taken.add(chosen.id);
@@ -230,7 +237,12 @@ class PatchEngine {
     return patches;
   }
 
-  Addition? _best(List<Addition> pool, Map<Addition, double> scored, PickAngle angle) {
+  Addition? _best(
+    List<Addition> pool,
+    Map<Addition, double> scored,
+    PickAngle angle,
+    int seed,
+  ) {
     if (pool.isEmpty) return null;
     final sorted = [...pool]..sort((a, b) {
         final primary = switch (angle) {
@@ -241,9 +253,35 @@ class PatchEngine {
         if (primary != 0) return primary;
         final byScore = scored[b]!.compareTo(scored[a]!);
         if (byScore != 0) return byScore;
-        return a.id.compareTo(b.id); // deterministic final tie-break
+        // Between two additions that are equally fast and equally good, the
+        // last word used to go to whichever sorted first by id — so hummus led
+        // every plate in the catalogue and the whole thing looked canned.
+        //
+        // Still not a coin toss: the order is fixed by the plate, so the same
+        // meal always gives the same answer and a test can pin it. A different
+        // meal shuffles the ties differently.
+        return _mix(a.id, seed).compareTo(_mix(b.id, seed));
       });
     return sorted.first;
+  }
+
+  /// One number standing for this plate: the meal and its foods, order-independent.
+  static int _seed(MealSlot slot, List<FoodItem> foods) {
+    final ids = [for (final f in foods) f.id]..sort();
+    return _hash('${slot.id}|${ids.join(",")}');
+  }
+
+  /// Where [id] falls in this plate's ordering. Stable for a given plate.
+  static int _mix(String id, int seed) => _hash('$seed:$id');
+
+  /// FNV-1a. Small, deterministic, and no dependency — the point is a stable
+  /// spread, not cryptography.
+  static int _hash(String value) {
+    var h = 0x811c9dc5;
+    for (final unit in value.codeUnits) {
+      h = ((h ^ unit) * 0x01000193) & 0x7fffffff;
+    }
+    return h;
   }
 
   /// The one-line "why this" under each card. It names the gaps this addition

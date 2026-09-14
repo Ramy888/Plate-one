@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/voice_agent_session.dart';
 import '../domain/models.dart';
+import '../state/api_providers.dart';
 import '../state/plate_providers.dart';
 import '../state/providers.dart';
 import '../state/save_patch.dart';
@@ -68,7 +69,12 @@ class VoiceAgentScreen extends ConsumerWidget {
         titleSpacing: Space.lg,
         title: const _Brand(),
         actions: [
-          if (voice.lastTurnLatencyMs case final ms?) _Latency(ms: ms),
+          // On a phone these live in a strip under the bar instead: four
+          // controls and two readouts do not fit across 390 pixels, and the
+          // two that are readouts rather than controls are the ones to move.
+          if (!narrow) const _PlatesLeft(),
+          if (!narrow && voice.lastTurnLatencyMs != null)
+            _Latency(ms: voice.lastTurnLatencyMs!),
           // On a phone the microphone comes up here once there is a
           // conversation: the thread wants the whole screen, and a control
           // that matters this much should not be something you scroll to.
@@ -115,19 +121,43 @@ class VoiceAgentScreen extends ConsumerWidget {
                 : _Thread(turns: voice.turns);
 
             if (!wide) {
+              // What is left, and how fast it answered: readouts, not controls,
+              // so they sit together under the bar rather than competing with
+              // the buttons in it.
+              final strip = _InfoStrip(latencyMs: voice.lastTurnLatencyMs);
+
               // Idle is the plate in the middle of the screen with the
               // microphone under it, and nothing else at all.
               if (!active) {
-                return Center(child: SingleChildScrollView(child: column));
+                return Column(
+                  children: [
+                    strip,
+                    Expanded(
+                      child: Center(child: SingleChildScrollView(child: column)),
+                    ),
+                  ],
+                );
               }
               // Once there is a conversation the thread takes the phone, and
               // the plate comes down over it when it is wanted. Splitting a
               // small screen in half gave each half too little: a plate too
               // small to read and three messages of thread.
-              return _MobileStage(
-                voice: voice,
-                thread: thread,
-                plateSize: (constraints.maxWidth * 0.62).clamp(150.0, 260.0),
+              return Column(
+                children: [
+                  strip,
+                  // Whether it is listening, thinking or talking. Above the
+                  // stage rather than inside it: the plate sheet comes down
+                  // over everything in there, and "is this thing on?" is the
+                  // one question a voice interface must always answer.
+                  _AgentState(state: voice, hideWhenIdle: true),
+                  Expanded(
+                    child: _MobileStage(
+                      voice: voice,
+                      thread: thread,
+                      plateSize: (constraints.maxWidth * 0.62).clamp(150.0, 260.0),
+                    ),
+                  ),
+                ],
               );
             }
 
@@ -195,20 +225,124 @@ class _PlateColumn extends StatelessWidget {
         const _FavouriteBanner(),
         _Plate(size: plateSize),
         _SelectedPatch(compact: compact),
-        // Idle on a phone is the one place this line earns its space: an empty
-        // plate and a microphone, and the word for what to do with them. Once
-        // there is a conversation it goes quiet again — see _MobileStage.
-        _AgentState(state: voice),
         if (voice.failure case final failure?) _Failure(message: failure),
         Padding(
-          padding: const EdgeInsets.only(bottom: Space.md, top: Space.xs),
+          padding: const EdgeInsets.only(top: Space.xs),
           child: MicButton(
             onTap: onMic,
             listening: voice.isLive,
             tooltip: voice.isLive ? 'End the conversation' : 'Start talking',
           ),
         ),
+        // Under the microphone, because it is a caption for the microphone:
+        // "describe your meal" is what to do with the button, not a label for
+        // the plate above it. Idle on a phone is the one place this line earns
+        // its space at all — once there is a conversation it goes quiet again,
+        // see _MobileStage.
+        Padding(
+          padding: const EdgeInsets.only(top: Space.sm, bottom: Space.md),
+          child: _AgentState(state: voice),
+        ),
       ],
+    );
+  }
+}
+
+/// The row under the app bar on a phone: what is left, and how fast it answered.
+class _InfoStrip extends StatelessWidget {
+  const _InfoStrip({this.latencyMs});
+
+  final int? latencyMs;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.xs),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const _PlatesLeft(),
+          if (latencyMs case final ms?) _Latency(ms: ms),
+        ],
+      ),
+    );
+  }
+}
+
+/// How many plates are left today, in the app bar.
+///
+/// A try is spent by keeping a plate, and the microphone will not open without
+/// one — so running out is the single thing that stops the app working, and it
+/// used to be invisible until the moment it bit. Tapping it is the way back in.
+///
+/// Stateful for one reason: the allowance is fetched when the screen appears.
+/// Nothing else on this screen asked the server for it, so the number was
+/// whatever the last registration happened to return.
+class _PlatesLeft extends ConsumerStatefulWidget {
+  const _PlatesLeft();
+
+  @override
+  ConsumerState<_PlatesLeft> createState() => _PlatesLeftState();
+}
+
+class _PlatesLeftState extends ConsumerState<_PlatesLeft> {
+  @override
+  void initState() {
+    super.initState();
+    // After the frame: this runs during a build, and refreshing writes to a
+    // provider the same build is reading.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(deviceProvider.notifier).refreshQuota();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final quota = ref.watch(deviceProvider).quota;
+    // Nothing known yet. A count that guesses is worse than no count.
+    if (quota == null) return const SizedBox.shrink();
+
+    final none = quota.plates <= 0;
+    final colour = none ? PlateColors.pro : PlateColors.green;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: Space.xs),
+      child: Tooltip(
+        message: none
+            ? 'No plates left today. A promo code opens more.'
+            : '${quota.plates} ${quota.plates == 1 ? "plate" : "plates"} left today',
+        child: Material(
+          color: none ? PlateColors.proSoft : PlateColors.greenSoft,
+          borderRadius: BorderRadius.circular(kRadius),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            // Always reachable, not only once it has run out: somebody with a
+            // code should not have to spend their last plate to be offered the
+            // chance to use it.
+            onTap: () => PromoDialog.show(context),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Space.sm,
+                vertical: Space.xs,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(LucideIcons.utensils, size: 14, color: colour),
+                  const SizedBox(width: Space.xs),
+                  Text(
+                    '${quota.plates}',
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelLarge
+                        ?.copyWith(color: colour, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -343,11 +477,6 @@ class _MobileStageState extends State<_MobileStage>
         Positioned.fill(
           child: Column(
             children: [
-              // Whether it is listening, thinking or talking. This used to sit
-              // under the plate; with the plate behind a handle it would have
-              // gone with it, and "is this thing on?" is the one question a
-              // voice interface must always answer.
-              _AgentState(state: widget.voice, hideWhenIdle: true),
               if (widget.voice.failure case final failure?) _Failure(message: failure),
               Expanded(child: widget.thread),
             ],
