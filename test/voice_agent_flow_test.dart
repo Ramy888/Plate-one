@@ -431,12 +431,51 @@ void main() {
         reason: 'pulling the handle brings the plate down over the thread');
   });
 
-  testWidgets('a settled reply points at the cards rather than duplicating them',
+  testWidgets('the cards arrive under the sentence that introduces them',
       (tester) async {
-    // It used to be a second button that ran the engine. Two controls doing
-    // the same job only makes someone wonder which is the real one.
+    // The engine answers in milliseconds; the sentence about its answer takes
+    // ten seconds to say. Shown when the tool returns, the cards land above
+    // their own explanation, and the reply points "below" at a row already
+    // above it.
     final container = await openHome(tester);
     container.read(mealDraftProvider.notifier).toggleFood('white_rice');
+    await tapMic(tester);
+
+    await container.read(agentToolsProvider).dispatch(const ToolCall(
+      callId: 'c1',
+      name: 'get_recommendation',
+      arguments: <String, dynamic>{},
+    ));
+    await tester.pump();
+    expect(find.text('Tap one to see it on your plate'), findsNothing,
+        reason: 'the agent has not said anything about them yet');
+
+    // The tool call has a reply all of its own, and it ends the moment the
+    // engine answers — nine seconds before a word is spoken about it. That
+    // ending must not be mistaken for the agent having introduced anything.
+    session.says(const ReplyDone(replyId: 'tools', interrupted: false));
+    await tester.pump();
+    expect(find.text('Tap one to see it on your plate'), findsNothing,
+        reason: 'a tool call finishing is not the agent speaking');
+
+    session.says(const ReplyStarted('r1'));
+    session.says(const AgentTranscript(text: 'You could add a salad.', interrupted: false));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Tap one to see it on your plate'), findsOneWidget);
+    // It used to be a second button that ran the engine. Two controls doing
+    // the same job only makes someone wonder which is the real one.
+    expect(find.text('Select from patches below'), findsOneWidget);
+    expect(find.text('Add patch now'), findsNothing);
+  });
+
+  testWidgets('a reply with no cards under it does not point at any',
+      (tester) async {
+    // "I did not recognise those" and "I can only talk about what is on the
+    // plate" both used to carry a line telling someone to select from patches
+    // below, with nothing below to select.
+    await openHome(tester);
     await tapMic(tester);
 
     session.says(const ReplyStarted('r1'));
@@ -444,8 +483,8 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Select from patches below'), findsOneWidget);
-    expect(find.text('Add patch now'), findsNothing);
+    expect(find.text('Anything green?'), findsOneWidget);
+    expect(find.text('Select from patches below'), findsNothing);
   });
 
   testWidgets('a fourth card reveals one more, without a second round trip',
@@ -570,6 +609,31 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('See your plate'), findsOneWidget,
         reason: 'and then get out of the way again');
+  });
+
+  testWidgets('the peek happens once, not on every turn', (tester) async {
+    // The sheet is shown as the conversation opens. It must not come back down
+    // every time a line arrives — the thread updates constantly while someone
+    // is talking, and a plate that drops over it each time is unusable.
+    final container = await openHome(tester);
+    await tapMic(tester);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 2000));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('See your plate'), findsOneWidget, reason: 'peek is over');
+
+    for (final line in ['rice', 'and chicken', 'and salad']) {
+      session.says(const ReplyStarted('r'));
+      session.says(AgentTranscript(text: line, interrupted: false));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+    container.read(mealDraftProvider.notifier).toggleFood('white_rice');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('See your plate'), findsOneWidget,
+        reason: 'the sheet stayed where it was left');
   });
 
   testWidgets('a peek does not fight someone who opened it themselves',

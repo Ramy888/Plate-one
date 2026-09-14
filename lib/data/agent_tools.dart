@@ -55,7 +55,13 @@ class AgentTools {
 
   /// The engine produced options. Puts them in the conversation, so the person
   /// can pick one by tapping as well as by saying so.
-  final void Function(List<Patch> options)? onRecommendations;
+  ///
+  /// [now] separates the two ways this happens. Asked for by hand, the cards
+  /// should appear at once — nobody is about to say anything about them. Asked
+  /// for by the agent, they wait until it has finished the sentence that
+  /// introduces them; the engine answers in milliseconds and the sentence takes
+  /// ten seconds, so shown immediately they arrive above their own explanation.
+  final void Function(List<Patch> options, {bool now})? onRecommendations;
 
   /// Keeps the patch in the history.
   ///
@@ -286,7 +292,7 @@ class AgentTools {
     _chosen = null;
     _gapIds = result.gaps.map((g) => g.id).toList();
 
-    onRecommendations?.call([...result.patches, ...result.alternates]);
+    onRecommendations?.call([...result.patches, ...result.alternates], now: force);
 
     return {
       'status': result.patches.isEmpty ? 'balanced' : 'ok',

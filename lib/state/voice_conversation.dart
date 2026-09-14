@@ -174,8 +174,8 @@ final agentToolsProvider = Provider<AgentTools>((ref) {
       ref.read(chosenPatchProvider.notifier).set(null);
       ref.read(plateVisualProvider.notifier).request(foodIds: foodIds);
     },
-    onRecommendations: (options) =>
-        ref.read(voiceConversationProvider.notifier).offer(options),
+    onRecommendations: (options, {bool now = false}) =>
+        ref.read(voiceConversationProvider.notifier).offer(options, now: now),
   );
 });
 
@@ -294,8 +294,29 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
   ///
   /// They arrive as their own entry rather than as text, because three things
   /// to choose between is a thing you tap, not a sentence you listen to twice.
-  void offer(List<Patch> options) {
+  void offer(List<Patch> options, {bool now = false}) {
     if (options.isEmpty) return;
+    if (now) {
+      _pending = options;
+      _flushOffer();
+      return;
+    }
+    // Held, not shown. The engine answers the moment the tool is called, which
+    // is ten seconds before the agent finishes saying what it found — so the
+    // cards used to land above the sentence that introduces them, and every
+    // reply pointed "below" at a row that was already above it. They go in once
+    // the agent has spoken.
+    _pending = options;
+  }
+
+  /// Options waiting for the agent to finish its sentence.
+  List<Patch>? _pending;
+
+  /// Puts the held options into the thread, under the turn that announced them.
+  void _flushOffer() {
+    final options = _pending;
+    if (options == null) return;
+    _pending = null;
     state = state.copyWith(
       turns: [...state.turns, VoiceTurn(fromUser: false, text: '', settled: true, options: options)],
     );
@@ -407,18 +428,28 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
           settled: true,
           interrupted: event.interrupted,
         );
+        // The sentence is finished, so the cards it was about can appear.
+        _flushOffer();
 
       case VoiceSessionError():
         // Surfaced only when it actually ended the conversation; the session
         // already decides which of those do.
         if (event.endsSession) state = state.copyWith(failure: event.message);
 
+      case SessionEnded():
+        // Nothing is left holding cards that were never introduced: if the
+        // conversation is over, the sentence is not coming.
+        _flushOffer();
+
       case SessionReady() ||
             SessionUpdated() ||
-            SessionEnded() ||
             ReplyDone() ||
             ToolCall() ||
             UnknownVoiceEvent():
+        // Deliberately not ReplyDone. A tool call gets its own reply, and that
+        // one ends the moment the engine answers — nine seconds before the
+        // agent says anything about it. Flushing there put the cards above the
+        // sentence again, which is the bug this was meant to fix.
         break;
     }
   }

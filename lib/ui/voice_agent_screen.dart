@@ -1055,15 +1055,32 @@ class _ThreadState extends State<_Thread> {
         bottom: Space.xxl,
       ),
       itemCount: widget.turns.length,
-      itemBuilder: (context, i) => _Bubble(turn: widget.turns[i], index: i),
+      itemBuilder: (context, i) => _Bubble(
+        turn: widget.turns[i],
+        index: i,
+        // Only the turn the cards actually belong to points at them. Every
+        // settled reply used to carry this line, including "I did not
+        // recognise those" and "I can only talk about what is on the plate" —
+        // both of which pointed at a row that was not there.
+        pointsAtOptions: i + 1 < widget.turns.length &&
+            widget.turns[i + 1].options.isNotEmpty,
+      ),
     );
   }
 }
 
 class _Bubble extends ConsumerWidget {
-  const _Bubble({required this.turn, required this.index});
+  const _Bubble({
+    required this.turn,
+    required this.index,
+    this.pointsAtOptions = false,
+  });
 
   final VoiceTurn turn;
+
+  /// Whether a row of cards follows this turn, and so whether saying "below"
+  /// is true.
+  final bool pointsAtOptions;
 
   /// Where this sits in the thread, so "show more" knows which row to grow.
   final int index;
@@ -1114,7 +1131,7 @@ class _Bubble extends ConsumerWidget {
             // A pointer, not a control. The cards below are the thing to
             // press; a second button that did the same job would only make
             // someone wonder which of the two was the real one.
-            if (!mine && turn.settled)
+            if (!mine && turn.settled && pointsAtOptions)
               Padding(
                 padding: const EdgeInsets.only(top: Space.xs),
                 child: Row(
