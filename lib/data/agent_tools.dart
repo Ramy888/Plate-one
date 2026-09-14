@@ -202,6 +202,7 @@ class AgentTools {
 
     final resolved = _resolve(args['foods'], slot);
     setFoods(resolved.ids);
+    _plateChanged(resolved.unmatched);
     onMealChanged?.call(resolved.ids);
     return {
       'meal': slot.id,
@@ -214,8 +215,20 @@ class AgentTools {
     final slot = currentSlot();
     final resolved = _resolve(args['foods'], slot);
     setFoods([...currentFoodIds(), ...resolved.ids]);
+    _plateChanged(resolved.unmatched);
     onMealChanged?.call(currentFoodIds());
     return {'matched': resolved.matched, 'unmatched': resolved.unmatched};
+  }
+
+  /// The plate is not what it was, so nothing decided about the old one holds.
+  ///
+  /// The options the engine offered were an answer to a different question. Left
+  /// in place, `choose_patch` would accept an addition chosen for a plate that
+  /// no longer exists and hand back its reason as though it still applied.
+  void _plateChanged(List<String> unmatched) {
+    _offered.clear();
+    _chosen = null;
+    _unresolved = unmatched;
   }
 
   /// Runs the engine and offers the result, without the agent asking.
@@ -225,14 +238,38 @@ class AgentTools {
   /// the same path as the tool, so `choose_patch` still recognises what was
   /// offered and the two cannot disagree about which options exist.
   List<Patch> recommendNow() {
-    _getRecommendation();
+    // Asked for by hand. The gate above is there to stop the model advising on
+    // a plate it did not understand, not to stop a person pressing a button.
+    _getRecommendation(force: true);
     return _offered.values.toList();
   }
 
-  Map<String, dynamic> _getRecommendation() {
+  Map<String, dynamic> _getRecommendation({bool force = false}) {
     if (currentFoodIds().isEmpty) {
       // Not an error. The agent should ask what is on the plate, not apologise.
       return {'status': 'no_food_yet', 'options': const []};
+    }
+
+    // Advice about a plate we did not understand is worse than no advice.
+    //
+    // Someone described an Ethiopian meal — injera, doro wat, kitfo, shiro —
+    // and one word of it matched the catalogue. The agent was told to ask about
+    // anything unmatched; it called this instead, half a second later, and read
+    // out what the engine makes of a plate holding one egg. The prompt said to
+    // ask. Asking is now the only thing it can do.
+    //
+    // Once, not forever: this clears as it refuses, so the turn after the
+    // question goes through whatever the answer was. A gate that cannot be
+    // satisfied is a conversation that cannot end.
+    if (!force && _unresolved.isNotEmpty) {
+      final asking = _unresolved;
+      _unresolved = const [];
+      return {
+        'status': 'ask_first',
+        'unmatched': asking,
+        'message': 'These were not understood. Ask what they are before '
+            'recommending anything.',
+      };
     }
 
     final result = recommend();
@@ -310,6 +347,10 @@ class AgentTools {
     await save(addition: patch.addition, gapIds: _gapIds);
     return {'saved': true, 'name': patch.addition.name};
   }
+
+  /// Foods the person named that the catalogue did not recognise, and that
+  /// nobody has asked about yet.
+  List<String> _unresolved = const [];
 
   /// What `choose_patch` settled on, and the gaps it was chosen to fill.
   Patch? _chosen;

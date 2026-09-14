@@ -290,6 +290,66 @@ void main() {
     });
   });
 
+  group('a plate it did not understand', () {
+    test('refuses to recommend until the unmatched foods are asked about', () async {
+      // The failure this exists for: someone described injera, doro wat, kitfo
+      // and shiro, one word matched, and the agent read out what the engine
+      // makes of a plate holding a single egg — half a second after being told
+      // six things were unrecognised. The prompt said to ask. Now so does this.
+      final tools = build();
+      final set = await call(tools, 'set_meal', {
+        'meal': 'lunch_dinner',
+        'foods': ['injera', 'doro wat', 'kitfo', 'shiro', 'egg'],
+      });
+      expect((set['unmatched']! as List), hasLength(4));
+
+      final blocked = await call(tools, 'get_recommendation');
+      expect(blocked['status'], 'ask_first');
+      expect(blocked['unmatched'], containsAll(['injera', 'kitfo']));
+      expect(blocked.containsKey('options'), isFalse,
+          reason: 'nothing to read out, so nothing to be tempted by');
+    });
+
+    test('lets the conversation move on once it has asked', () async {
+      // A gate that cannot be satisfied is a conversation that cannot end.
+      final tools = build();
+      await call(tools, 'set_meal', {
+        'meal': 'lunch_dinner',
+        'foods': ['injera', 'egg'],
+      });
+      await call(tools, 'get_recommendation');
+
+      final second = await call(tools, 'get_recommendation');
+      expect(second['status'], 'ok');
+    });
+
+    test('a plate that was understood is not held up', () async {
+      final tools = build();
+      await call(tools, 'set_meal', {
+        'meal': 'lunch_dinner',
+        'foods': ['rice', 'chicken'],
+      });
+      expect((await call(tools, 'get_recommendation'))['status'], 'ok');
+    });
+
+    test('changing the plate withdraws the options it was offered for', () async {
+      // The options were an answer to a different question. Left standing,
+      // choose_patch would accept one chosen for a plate that no longer exists.
+      final tools = build();
+      await call(tools, 'set_meal', {
+        'meal': 'lunch_dinner',
+        'foods': ['rice', 'chicken'],
+      });
+      final options = (await call(tools, 'get_recommendation'))['options']! as List;
+      final id = (options.first as Map<String, dynamic>)['id'] as String;
+
+      await call(tools, 'add_foods', {'foods': ['salad']});
+
+      final chosen = await call(tools, 'choose_patch', {'addition_id': id});
+      expect(chosen['error'], 'not_offered');
+    });
+  });
+
   group('what the agent is given to read out', () {
     test('every option it should name, and a count of the rest', () async {
       // The agent reads the options aloud as choices, so it has to receive all
