@@ -74,7 +74,10 @@
     // Free tries. A try is the whole journey — talk, be recommended
     // something, see it drawn — and keeping the plate is what spends it.
     // One a day; a promo code buys more.
-    "PLATES_PER_DAY": "1",
+    // Temporarily 10 for the demo recording on 2026-09-18 — saving a plate is
+    // what spends a try, so at 1 a second take is impossible until midnight.
+    // Put this back to "1" once the video is shot.
+    "PLATES_PER_DAY": "10",
 
     // Pictures. Never meant to be the thing that stops anyone: one try redraws
     // the meal as it is described and again for each suggestion tried, and a
