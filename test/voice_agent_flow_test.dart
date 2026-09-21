@@ -30,6 +30,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 class FakeSession implements VoiceSession {
   FakeSession({this.failOnStart, this.throwOnStart});
 
+  /// Thrown by `stop()`, and a trailing event pushed while it closes. Both are
+  /// what a real socket does on the way out.
+  Object? throwOnStop;
+  VoiceEvent? trailingOnStop;
+
   /// When set, `start()` throws and reports this.
   final String? failOnStart;
 
@@ -79,7 +84,17 @@ class FakeSession implements VoiceSession {
   @override
   Future<void> stop() async {
     stopped = true;
+    // A real socket does not go quiet the instant it is told to end: whatever
+    // was already in flight lands a moment later. Delayed rather than
+    // immediate, so it arrives *after* stop() has returned — which is the
+    // window that mattered.
+    if (trailingOnStop case final event?) {
+      Future<void>.delayed(const Duration(milliseconds: 10), () {
+        if (!_events.isClosed) _events.add(event);
+      });
+    }
     becomes(VoiceAgentState.ended);
+    if (throwOnStop case final error?) throw error;
   }
 
   @override
@@ -605,6 +620,49 @@ void main() {
 
     expect(find.byIcon(LucideIcons.utensils), findsOneWidget);
     expect(find.byType(Image), findsOneWidget, reason: 'the brand mark only');
+  });
+
+  testWidgets('a transcript arriving as it closes cannot undo the stop',
+      (tester) async {
+    // The reported bug: press stop and the conversation is still there. The
+    // subscriptions were still live while the session was being told to end,
+    // so a transcript landing in that window wrote a turn straight back into
+    // the thread that had just been cleared.
+    final container = await openHome(tester);
+    await tapMic(tester);
+    session.says(const UserTranscript('rice and chicken'));
+    await tester.pump();
+    session.trailingOnStop = const AgentTranscript(
+      text: 'one last thing', interrupted: false,
+    );
+
+    await container.read(voiceConversationProvider.notifier).stop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('one last thing'), findsNothing);
+    expect(find.text('rice and chicken'), findsNothing);
+    expect(container.read(voiceConversationProvider).turns, isEmpty);
+    expect(find.text('Describe your meal'), findsOneWidget);
+  });
+
+  testWidgets('a session that throws on the way out still clears the screen',
+      (tester) async {
+    // Whatever happened to the socket, the button was pressed and the screen
+    // has to answer it.
+    final container = await openHome(tester);
+    await tapMic(tester);
+    session.says(const UserTranscript('rice and chicken'));
+    await tester.pump();
+    session.throwOnStop = StateError('socket already gone');
+
+    await container.read(voiceConversationProvider.notifier).stop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(container.read(voiceConversationProvider).turns, isEmpty);
+    expect(container.read(mealDraftProvider).foodIds, isEmpty);
+    expect(find.text('Describe your meal'), findsOneWidget);
   });
 
   testWidgets('stopping clears the plate and the thread, back to idle',

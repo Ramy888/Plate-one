@@ -376,8 +376,29 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
 
   Future<void> stop() async {
     final session = _session;
-    if (session != null) {
+    if (session == null) {
+      reset();
+      return;
+    }
+
+    // Stop listening *before* closing the session, not after. The socket is
+    // still open while it is being told to end, and a transcript that lands in
+    // that window was writing a turn straight back into a thread that had just
+    // been cleared — the screen kept the conversation and never went idle.
+    unawaited(_events?.cancel());
+    unawaited(_states?.cancel());
+    _events = null;
+    _states = null;
+    _session = null;
+
+    try {
       await session.stop();
+    } catch (_) {
+      // A socket that has already gone is not a reason to leave somebody's
+      // last meal on the screen. Whatever happened here, the button was
+      // pressed and the screen has to answer it.
+    } finally {
+      unawaited(session.dispose());
       if (session.failure != null) {
         // A conversation that ended badly keeps its reason on screen; one the
         // person ended themselves has nothing to explain.
@@ -386,10 +407,10 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
           failure: session.failure,
         );
         _clearPlate();
-        return;
+      } else {
+        reset();
       }
     }
-    reset();
   }
 
   /// Back to an empty plate and an empty thread.
