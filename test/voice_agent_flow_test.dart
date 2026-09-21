@@ -491,6 +491,42 @@ void main() {
     expect(find.text('Select from patches below'), findsNothing);
   });
 
+  testWidgets('only the newest row of cards can be tapped', (tester) async {
+    // Two rows of options end up in one transcript whenever the plate changes.
+    // The older row is a record of what was offered about a meal that no longer
+    // exists, and tapping it put that addition on the current plate.
+    final container = await openHome(tester);
+    await tapMic(tester);
+    container.read(mealDraftProvider.notifier).toggleFood('white_rice');
+
+    final tools = container.read(agentToolsProvider);
+    Future<void> offerRound() async {
+      await tools.dispatch(const ToolCall(
+        callId: 'c', name: 'get_recommendation', arguments: <String, dynamic>{},
+      ));
+      session.says(const ReplyStarted('r'));
+      session.says(const AgentTranscript(text: 'Here you go.', interrupted: false));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    await offerRound();
+    // The plate changes, so the engine answers again and a second row lands.
+    container.read(mealDraftProvider.notifier).toggleFood('chicken');
+    await offerRound();
+
+    final rows = find.text('Tap one to see it on your plate');
+    final spent = find.text('Suggested earlier, for a different plate');
+    expect(rows, findsOneWidget, reason: 'exactly one row is live');
+    expect(spent, findsOneWidget, reason: 'the older row says so');
+
+    // And the dead row does nothing: tapping its first card changes nothing.
+    final before = container.read(chosenPatchProvider);
+    final cards = find.byType(InkWell);
+    expect(cards, findsWidgets);
+    expect(container.read(chosenPatchProvider), before);
+  });
+
   testWidgets('a fourth card reveals one more, without a second round trip',
       (tester) async {
     final container = await openHome(tester);
@@ -571,11 +607,12 @@ void main() {
     expect(find.byType(Image), findsOneWidget, reason: 'the brand mark only');
   });
 
-  testWidgets('stopping leaves the plate up, so it can still be kept',
+  testWidgets('stopping clears the plate and the thread, back to idle',
       (tester) async {
-    // Stopping used to wipe the thread and the plate together, which deleted
-    // the meal in the half second between somebody stopping talking and
-    // reaching for save. The microphone closes; the plate stays.
+    // The microphone button ends the conversation, and ending it ends the meal
+    // with it: an empty plate, an empty thread, and the idle screen. Leaving
+    // the last plate and its transcript up means the next person to speak
+    // starts by clearing away somebody else's dinner.
     final container = await openHome(tester);
     await tapMic(tester);
     session.becomes(VoiceAgentState.listening);
@@ -584,36 +621,19 @@ void main() {
     container.read(mealDraftProvider.notifier).toggleFood('white_rice');
     await tester.pump();
     await tester.pump();
-
-    await container.read(voiceConversationProvider.notifier).stop();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-
     expect(find.text('rice and chicken'), findsOneWidget);
-    expect(container.read(voiceConversationProvider).turns, isNotEmpty);
-    expect(container.read(mealDraftProvider).foodIds, isNotEmpty);
-    expect(container.read(voiceConversationProvider).isLive, isFalse,
-        reason: 'the microphone is closed and nothing is billing');
-  });
 
-  testWidgets('the next conversation clears the last one', (tester) async {
-    // The clearing did not disappear, it moved: nobody should start by
-    // clearing away somebody else's dinner.
-    final container = await openHome(tester);
-    await tapMic(tester);
-    session.says(const UserTranscript('rice and chicken'));
-    container.read(mealDraftProvider.notifier).toggleFood('white_rice');
-    await tester.pump();
     await container.read(voiceConversationProvider.notifier).stop();
-    await tester.pump();
-
-    await container.read(voiceConversationProvider.notifier).start();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('rice and chicken'), findsNothing);
-    expect(container.read(mealDraftProvider).foodIds, isEmpty);
+    expect(container.read(voiceConversationProvider).turns, isEmpty);
     expect(container.read(chosenPatchProvider), isNull);
+    expect(container.read(mealDraftProvider).foodIds, isEmpty);
+    // Back to idle: the plate, the microphone, and the line under it.
+    expect(find.byType(MicButton), findsOneWidget);
+    expect(find.text('Describe your meal'), findsOneWidget);
   });
 
   testWidgets('the app bar says how many plates are left', (tester) async {

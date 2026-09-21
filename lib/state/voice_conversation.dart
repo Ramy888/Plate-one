@@ -362,15 +362,13 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
         return;
       }
     }
-    // Stopped, not thrown away. The microphone closes and the socket with it —
-    // nothing is billing — but the plate and the thread stay on screen, because
-    // the plate is the thing the person is about to keep. Wiping it the moment
-    // they stopped talking deleted the meal in the half second before they
-    // could save it. The next conversation clears this one; see [start].
-    state = state.copyWith(agent: VoiceAgentState.ended, starting: false);
+    reset();
   }
 
   /// Back to an empty plate and an empty thread.
+  ///
+  /// This is what the microphone button does when it stops a conversation:
+  /// ending it ends the meal with it, and the screen returns to the idle plate.
   ///
   /// Ending the conversation ends the meal with it. Leaving the last plate and
   /// its transcript on screen would mean the next person to speak starts by

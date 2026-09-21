@@ -677,13 +677,7 @@ Future<void> _keepPlate(
   if (!context.mounted) return;
 
   Toast.show(context, 'Saved. That plate is in your favourites.');
-  if (endConversation) {
-    final conversation = ref.read(voiceConversationProvider.notifier);
-    await conversation.stop();
-    // Keeping the plate is the end of the meal, so this one does clear. Merely
-    // stopping the microphone no longer does — see VoiceConversation.stop.
-    conversation.reset();
-  }
+  if (endConversation) await ref.read(voiceConversationProvider.notifier).stop();
 }
 
 /// Keeping the plate, offered above it once there is something to keep.
@@ -1135,6 +1129,10 @@ class _Thread extends StatefulWidget {
 class _ThreadState extends State<_Thread> {
   final _controller = ScrollController();
 
+  /// Where the current row of cards is, or -1 when none has been offered.
+  int get _lastOptionsIndex =>
+      widget.turns.lastIndexWhere((turn) => turn.options.isNotEmpty);
+
   @override
   void initState() {
     super.initState();
@@ -1192,6 +1190,11 @@ class _ThreadState extends State<_Thread> {
       itemBuilder: (context, i) => _Bubble(
         turn: widget.turns[i],
         index: i,
+        // Only the newest row of cards can be tapped. The older ones are a
+        // record of what was offered earlier about a different plate, and
+        // pressing one of those put an addition chosen for a meal that has
+        // since changed onto the plate.
+        live: i == _lastOptionsIndex,
         // Only the turn the cards actually belong to points at them. Every
         // settled reply used to carry this line, including "I did not
         // recognise those" and "I can only talk about what is on the plate" —
@@ -1208,7 +1211,11 @@ class _Bubble extends ConsumerWidget {
     required this.turn,
     required this.index,
     this.pointsAtOptions = false,
+    this.live = true,
   });
+
+  /// Whether this turn's cards are the ones currently on offer.
+  final bool live;
 
   final VoiceTurn turn;
 
@@ -1223,7 +1230,9 @@ class _Bubble extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // A turn carrying options is the engine's answer, not something anyone
     // said out loud. It gets the whole width.
-    if (turn.options.isNotEmpty) return _Options(turn: turn, index: index);
+    if (turn.options.isNotEmpty) {
+      return _Options(turn: turn, index: index, live: live);
+    }
     if (turn.text.isEmpty) return const SizedBox.shrink();
 
     final mine = turn.fromUser;
@@ -1299,10 +1308,14 @@ class _Bubble extends ConsumerWidget {
 /// Three at a time. The engine has more, and they are behind the last card,
 /// because three is a choice and nine is a menu.
 class _Options extends ConsumerWidget {
-  const _Options({required this.turn, required this.index});
+  const _Options({required this.turn, required this.index, this.live = true});
 
   final VoiceTurn turn;
   final int index;
+
+  /// Superseded rows stay in the transcript — the conversation happened — but
+  /// they stop being controls.
+  final bool live;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1317,14 +1330,20 @@ class _Options extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: Space.sm),
             child: Text(
-              'Tap one to see it on your plate',
+              live
+                  ? 'Tap one to see it on your plate'
+                  : 'Suggested earlier, for a different plate',
               style: Theme.of(context)
                   .textTheme
                   .labelMedium
                   ?.copyWith(color: PlateColors.inkSoft),
             ),
           ),
-          SizedBox(
+          // Faded once superseded. A row that silently ignores a tap reads as
+          // broken; one that is visibly spent reads as history.
+          Opacity(
+            opacity: live ? 1 : 0.45,
+            child: SizedBox(
             height: 176,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
@@ -1333,17 +1352,24 @@ class _Options extends ConsumerWidget {
               itemBuilder: (context, i) {
                 if (i == shown.length) {
                   return _MoreCard(
-                    onTap: () =>
-                        ref.read(voiceConversationProvider.notifier).revealMore(index),
+                    onTap: live
+                        ? () => ref
+                            .read(voiceConversationProvider.notifier)
+                            .revealMore(index)
+                        : null,
                   );
                 }
                 return _OptionCard(
                   patch: shown[i],
-                  selected: shown[i].addition.id == chosen,
-                  onTap: () =>
-                      ref.read(voiceConversationProvider.notifier).choose(shown[i]),
+                  selected: live && shown[i].addition.id == chosen,
+                  onTap: live
+                      ? () => ref
+                          .read(voiceConversationProvider.notifier)
+                          .choose(shown[i])
+                      : null,
                 );
               },
+            ),
             ),
           ),
         ],
@@ -1356,7 +1382,8 @@ class _Options extends ConsumerWidget {
 class _MoreCard extends StatelessWidget {
   const _MoreCard({required this.onTap});
 
-  final VoidCallback onTap;
+  /// Null on a superseded row, same as the cards beside it.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1403,9 +1430,12 @@ class _OptionCard extends StatelessWidget {
     required this.onTap,
   });
 
+
   final Patch patch;
   final bool selected;
-  final VoidCallback onTap;
+
+  /// Null once this row has been superseded, which is what makes it inert.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
