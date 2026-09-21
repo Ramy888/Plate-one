@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plateone/data/catalog.dart';
 import 'package:plateone/domain/food_matcher.dart';
 import 'package:plateone/domain/models.dart';
 
@@ -178,6 +179,51 @@ void main() {
         final result = matcher.match(label, 0.9, slot: MealSlot.lunchDinner);
         expect(result.isMatched, isTrue, reason: 'alias "$label" resolves to nothing');
       }
+    });
+  });
+
+  group('the names people actually say', () {
+    // Every case here came out of a live session or is the obvious spelling of
+    // the dish. They all used to match nothing — "fuul" failed against a food
+    // literally named "Fuul medames", because the name rule wanted every word
+    // of the name and nobody says "medames".
+    late FoodMatcher matcher;
+
+    setUpAll(() async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      matcher = FoodMatcher((await Catalog.load()).foods);
+    });
+
+    String? hit(String said) => matcher
+        .match(said, 1, slot: MealSlot.lunchDinner)
+        .food
+        ?.id;
+
+    test('a distinctive word out of a multi-word dish is enough', () {
+      expect(hit('fuul'), 'fuul');
+      expect(hit('laban'), 'roz_bel_laban');
+      expect(hit('koshari'), 'koshari');
+    });
+
+    test('the spellings a transcriber produces', () {
+      // "tamia" and "phool" are verbatim from a recorded session.
+      expect(hit('tamia'), 'taameya');
+      expect(hit('phool'), 'fuul');
+      expect(hit('kushari'), 'koshari');
+      expect(hit('molokheya'), 'molokhia');
+      expect(hit('aish'), 'baladi_bread');
+    });
+
+    test('a word shared by several foods still goes through the aliases', () {
+      // "bread" belongs to three catalogue entries, so it is not distinctive
+      // and must not be grabbed by whichever one happens to be scored first.
+      expect(hit('bread'), 'white_bread');
+      expect(hit('white bread'), 'white_bread');
+      expect(hit('baladi bread'), 'baladi_bread');
+    });
+
+    test('a leaf is a vegetable, not a mystery', () {
+      expect(hit('spinach'), 'cooked_veg');
     });
   });
 }

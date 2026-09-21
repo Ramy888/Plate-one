@@ -677,7 +677,13 @@ Future<void> _keepPlate(
   if (!context.mounted) return;
 
   Toast.show(context, 'Saved. That plate is in your favourites.');
-  if (endConversation) await ref.read(voiceConversationProvider.notifier).stop();
+  if (endConversation) {
+    final conversation = ref.read(voiceConversationProvider.notifier);
+    await conversation.stop();
+    // Keeping the plate is the end of the meal, so this one does clear. Merely
+    // stopping the microphone no longer does — see VoiceConversation.stop.
+    conversation.reset();
+  }
 }
 
 /// Keeping the plate, offered above it once there is something to keep.

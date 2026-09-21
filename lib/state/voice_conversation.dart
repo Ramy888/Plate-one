@@ -256,6 +256,10 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
   /// only lets audio start from a gesture.
   Future<void> start() async {
     if (state.isLive) return;
+    // Whatever the last conversation left behind goes now, rather than when it
+    // ended — so somebody who stopped talking still has their plate to save,
+    // and nobody starts by clearing away somebody else's dinner.
+    _clearPlate();
     state = const VoiceConversationState(starting: true);
     // Whatever the plate was saying — a spent try, a code just redeemed — is
     // about the last conversation, not this one.
@@ -358,7 +362,12 @@ class VoiceConversation extends Notifier<VoiceConversationState> {
         return;
       }
     }
-    reset();
+    // Stopped, not thrown away. The microphone closes and the socket with it —
+    // nothing is billing — but the plate and the thread stay on screen, because
+    // the plate is the thing the person is about to keep. Wiping it the moment
+    // they stopped talking deleted the meal in the half second before they
+    // could save it. The next conversation clears this one; see [start].
+    state = state.copyWith(agent: VoiceAgentState.ended, starting: false);
   }
 
   /// Back to an empty plate and an empty thread.

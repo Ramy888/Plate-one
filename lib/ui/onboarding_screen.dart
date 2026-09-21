@@ -65,11 +65,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.lg),
-              child: FilledButton(
-                onPressed: _next,
-                child: Text(_page == _pageCount - 1 ? 'Start patching' : 'Continue'),
+            Readable(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.lg),
+                child: FilledButton(
+                  onPressed: _next,
+                  child: Text(_page == _pageCount - 1 ? 'Start patching' : 'Continue'),
+                ),
               ),
             ),
           ],
@@ -118,7 +120,12 @@ class _Page extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
+    // Readable, not full-bleed. On a laptop these pages were a headline running
+    // the whole width of the window and option rows a metre wide with a tick
+    // stranded at the far end — the choice and the thing you press to make it
+    // were at opposite sides of the screen.
+    return Readable(
+      child: ListView(
       padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, Space.lg),
       children: [
         Text(title, style: Theme.of(context).textTheme.displaySmall),
@@ -129,6 +136,7 @@ class _Page extends StatelessWidget {
         const SizedBox(height: Space.lg),
         ...children,
       ],
+      ),
     );
   }
 }

@@ -44,7 +44,7 @@ class RecognizedFood {
 }
 
 class FoodMatcher {
-  const FoodMatcher(this.foods);
+  FoodMatcher(this.foods);
 
   final List<FoodItem> foods;
 
@@ -106,6 +106,31 @@ class FoodMatcher {
     'falafel': 'taameya',
     'ful': 'fuul',
     'foul': 'fuul',
+    // Egyptian dishes as a transcriber spells them. These are not variants a
+    // rule can derive — they are different spellings of the same sound, and
+    // they are what a live session actually produced: "tamia" for taameya,
+    // "phool" for fuul.
+    'tamia': 'taameya',
+    'tameya': 'taameya',
+    'taamiya': 'taameya',
+    'phool': 'fuul',
+    'fool': 'fuul',
+    'kushari': 'koshari',
+    'koshary': 'koshari',
+    'molokheya': 'molokhia',
+    'molokhiya': 'molokhia',
+    'mulukhiyah': 'molokhia',
+    'aish': 'baladi_bread',
+    'eish': 'baladi_bread',
+    'baladi': 'baladi_bread',
+    'shawerma': 'shawarma',
+    'spinach': 'cooked_veg',
+    'kale': 'cooked_veg',
+    'courgette': 'cooked_veg',
+    'zucchini': 'cooked_veg',
+    'cucumber': 'salad',
+    'tomato': 'salad',
+    'tomatoes': 'salad',
   };
 
   static List<String> _tokens(String value) => value
@@ -174,6 +199,22 @@ class FoodMatcher {
       }
     }
 
+    // A distinctive word out of a multi-word name.
+    //
+    // The full-name rule above wants every significant word, so "Fuul medames"
+    // needed both — and nobody says "medames". Somebody asking for fuul got
+    // nothing back from a catalogue that contains it. A word that belongs to
+    // exactly one food in the catalogue is enough on its own; "bread" belongs
+    // to three, so it is not distinctive and falls through to the aliases.
+    if (score == 0) {
+      for (final token in wanted) {
+        if (_distinctive[token] == food.id) {
+          score = 50;
+          break;
+        }
+      }
+    }
+
     // Alias only when the general rule found nothing.
     if (score == 0) {
       for (final token in wanted) {
@@ -190,6 +231,29 @@ class FoodMatcher {
     // breakfast.
     if (food.slots.contains(slot)) score += 5;
     return score;
+  }
+
+  /// Words that belong to exactly one food in the catalogue, mapped to its id.
+  ///
+  /// Derived rather than listed: a hand-written table would only cover the
+  /// dishes somebody remembered, and would go stale the first time a food is
+  /// added. Built once on first use.
+  Map<String, String> get _distinctive => _distinctiveCache ??= _buildDistinctive();
+  Map<String, String>? _distinctiveCache;
+
+  Map<String, String> _buildDistinctive() {
+    final owners = <String, Set<String>>{};
+    for (final food in foods) {
+      for (final variant in _variants(food.name)) {
+        for (final word in variant) {
+          (owners[word] ??= <String>{}).add(food.id);
+        }
+      }
+    }
+    return {
+      for (final entry in owners.entries)
+        if (entry.value.length == 1) entry.key: entry.value.first,
+    };
   }
 
   /// "Beef or lamb" is two names, not one. Splitting on " or " lets either
