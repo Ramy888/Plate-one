@@ -115,7 +115,11 @@
     // localhost entries are for `flutter run -d chrome` and a local build.
     // How many people may redeem each promo code. The codes themselves are a
     // secret — see src/promo.ts — because this repository is public.
-    "PROMO_USES_PER_CODE": "1",
+    // Three people per code. One was unforgiving for judging: a judge who
+    // typed a code on their phone and then opened the app on a laptop is a
+    // different device and had no way back in. The ceiling that matters is
+    // GLOBAL_VOICE_SESSIONS_PER_DAY, not this.
+    "PROMO_USES_PER_CODE": "3",
 
     "ALLOWED_ORIGINS": "https://plateone.pages.dev,https://plate-one.pages.dev,http://localhost:8080,http://localhost:8000"
   }
