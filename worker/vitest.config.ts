@@ -35,6 +35,12 @@ export default defineWorkersConfig({
             // the "already spent" check catch the same case, and neither is
             // actually proven.
             PROMO_USES_PER_CODE: '2',
+            // One try, whatever production is tuned to. These tests are about
+            // what spending the day's try *means* — keeping a plate ends it,
+            // drawing one does not — and that is not a statement about the
+            // number. Raising the deployed allowance for a demo recording
+            // should not make the suite red.
+            PLATES_PER_DAY: '1',
           },
         },
       },

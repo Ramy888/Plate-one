@@ -176,7 +176,34 @@ final agentToolsProvider = Provider<AgentTools>((ref) {
     },
     onRecommendations: (options, {bool now = false}) =>
         ref.read(voiceConversationProvider.notifier).offer(options, now: now),
-  );
+  )..describe = (names) async {
+      // A food the catalogue has never heard of, described by the server in
+      // the engine's own terms. Asking the person to list flour and eggs put
+      // eggs and milk on the plate, and then the advice and the picture were
+      // both about a meal nobody ate.
+      final token = await ref.read(deviceProvider.notifier).token();
+      final described = await ref.read(apiProvider).classify(token, names);
+      if (described.isEmpty) return const [];
+
+      ref.read(describedFoodsProvider.notifier).remember([
+        for (final food in described)
+          FoodItem(
+            id: food.id,
+            name: food.name,
+            emoji: '🍽️',
+            icon: 'utensils',
+            provides: NutrientScores(
+              protein: food.protein,
+              fibre: food.fibre,
+              fat: food.fat,
+            ),
+            slots: MealSlot.values.toSet(),
+            tags: food.tags.toSet(),
+            group: food.group,
+          ),
+      ]);
+      return described.map((food) => food.id).toList();
+    };
 });
 
 /// The real thing: mints a token through the Worker, which is the only place

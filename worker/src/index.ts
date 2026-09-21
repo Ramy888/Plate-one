@@ -21,6 +21,7 @@ import {
   readJson,
   requireString,
 } from './http';
+import { postClassify } from './classify';
 import { postPlate, postPlateKeep } from './plate';
 import { postPromo } from './promo';
 import { getPreview } from './preview';
@@ -152,6 +153,13 @@ async function promoRoute(request: Request, env: Env): Promise<Response> {
   return postPromo(request, env);
 }
 
+// Describing an unknown food is a model call, so it carries the same per-IP
+// ceiling as drawing one. The plate it describes is the same plate.
+async function classifyRoute(request: Request, env: Env): Promise<Response> {
+  await enforceLimit(env, `classify:${rateKey(request)}`, 40, 3600);
+  return postClassify(request, env);
+}
+
 const ROUTES: Record<string, Partial<Record<string, Handler>>> = {
   '/v1/device': { POST: postDevice, DELETE: deleteDevice },
   '/v1/quota': { GET: getQuota },
@@ -160,6 +168,7 @@ const ROUTES: Record<string, Partial<Record<string, Handler>>> = {
   '/v1/voice/token': { POST: voiceTokenRoute },
   '/v1/plate/keep': { POST: postPlateKeep },
   '/v1/promo': { POST: promoRoute },
+  '/v1/classify': { POST: classifyRoute },
 };
 
 export default {

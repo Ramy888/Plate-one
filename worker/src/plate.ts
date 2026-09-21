@@ -1,6 +1,7 @@
 import { ADDITION_PHRASES } from './additions';
 import { spendGlobal } from './budget';
 import { authenticateDevice, quotaForDeviceRow, recordEvent } from './device';
+import { lookupDescribed } from './classify';
 import { FOOD_NAMES } from './foods';
 import { GeminiError, generateJson } from './gemini';
 import { ApiError, json, readJson, requireString } from './http';
@@ -41,7 +42,11 @@ export async function postPlate(request: Request, env: Env): Promise<Response> {
   const body = await readJson(request);
   const rawFoods = Array.isArray(body.foodIds) ? body.foodIds : [];
   const foodIds = rawFoods.filter((id): id is string => typeof id === 'string').slice(0, 12);
-  const unknown = foodIds.find((id) => !(id in FOOD_NAMES));
+  // A described food carries a "d:" id whose name this Worker wrote and stored
+  // itself. It is still not the caller's text: the client sends the id, the
+  // name comes from the table.
+  const describedNames = await lookupDescribed(env, foodIds);
+  const unknown = foodIds.find((id) => !(id in FOOD_NAMES) && !describedNames.has(id));
   if (unknown !== undefined) {
     throw new ApiError(400, 'invalid_food', 'That is not a food this app knows.');
   }
@@ -102,7 +107,7 @@ export async function postPlate(request: Request, env: Env): Promise<Response> {
 
   const plate =
     foodIds.length > 0
-      ? foodIds.map((id) => FOOD_NAMES[id]).join(', ')
+      ? foodIds.map((id) => FOOD_NAMES[id] ?? describedNames.get(id)).join(', ')
       : 'a simple everyday meal';
   const prompt =
     additionId === ''

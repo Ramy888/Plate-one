@@ -88,6 +88,35 @@ class PlateApi {
     return VoiceToken.fromJson(_decode(response));
   }
 
+  /// Describes foods the catalogue does not contain.
+  ///
+  /// Best effort by design: a plate with an unknown food on it is no worse off
+  /// than it was before this existed, so a failure here returns nothing rather
+  /// than an error somebody has to read.
+  Future<List<DescribedFood>> classify(
+    String deviceToken,
+    List<String> names,
+  ) async {
+    if (names.isEmpty) return const [];
+    try {
+      final response = await _send(
+        () => _client.post(
+          _uri('/v1/classify'),
+          headers: {..._auth(deviceToken), 'content-type': 'application/json'},
+          body: jsonEncode({'names': names}),
+        ),
+      );
+      final described =
+          (_decode(response)['described'] as List<dynamic>?) ?? const [];
+      return described
+          .map((raw) => DescribedFood.fromJson(raw as Map<String, dynamic>))
+          .where((food) => food.id.isNotEmpty && food.name.isNotEmpty)
+          .toList();
+    } on ApiFailure {
+      return const [];
+    }
+  }
+
   /// Ends the day's free try.
   ///
   /// Keeping a plate is the last thing somebody does with one, so it is what
@@ -321,6 +350,42 @@ class PromoResult {
   /// How many more tries it opened.
   final int granted;
   final Allowance quota;
+}
+
+/// A food the catalogue does not contain, described in the engine's terms.
+///
+/// The name is the server's, not anything typed here: the client carries the
+/// id, and the picture route looks the name up for itself.
+class DescribedFood {
+  const DescribedFood({
+    required this.id,
+    required this.name,
+    required this.protein,
+    required this.fibre,
+    required this.fat,
+    required this.tags,
+    required this.group,
+  });
+
+  final String id;
+  final String name;
+  final int protein;
+  final int fibre;
+  final int fat;
+  final List<String> tags;
+  final String group;
+
+  factory DescribedFood.fromJson(Map<String, dynamic> json) => DescribedFood(
+        id: json['id'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        protein: (json['protein'] as num?)?.toInt() ?? 0,
+        fibre: (json['fibre'] as num?)?.toInt() ?? 0,
+        fat: (json['fat'] as num?)?.toInt() ?? 0,
+        tags: ((json['tags'] as List<dynamic>?) ?? const [])
+            .map((t) => t.toString())
+            .toList(),
+        group: json['group'] as String? ?? 'dishes',
+      );
 }
 
 /// Permission to hold one conversation.

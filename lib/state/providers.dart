@@ -177,13 +177,39 @@ class MealDraftController extends Notifier<MealDraft> {
 final mealDraftProvider = NotifierProvider<MealDraftController, MealDraft>(MealDraftController.new);
 
 /// The whole recommendation, recomputed whenever anything it depends on moves.
+/// Foods the catalogue does not contain, described by the server in the
+/// engine's own terms and then treated exactly like catalogue ones.
+///
+/// Somebody says "pancakes". There is no pancake in the catalogue, and the
+/// engine never needed the name anyway — it reasons over protein, fibre and
+/// fat. Held here rather than inside the catalogue because the catalogue is
+/// the shipped, fixed thing and these arrive during a conversation.
+class DescribedFoods extends Notifier<Map<String, FoodItem>> {
+  @override
+  Map<String, FoodItem> build() => const {};
+
+  void remember(Iterable<FoodItem> foods) {
+    if (foods.isEmpty) return;
+    state = {...state, for (final food in foods) food.id: food};
+  }
+}
+
+final describedFoodsProvider =
+    NotifierProvider<DescribedFoods, Map<String, FoodItem>>(DescribedFoods.new);
+
 final patchResultProvider = Provider<PatchResult>((ref) {
   final draft = ref.watch(mealDraftProvider);
   final settings = ref.watch(settingsProvider);
   final catalog = ref.watch(catalogProvider);
+  final described = ref.watch(describedFoodsProvider);
   return ref.watch(patchEngineProvider).patch(
         slot: draft.slot,
-        foods: catalog.foodsByIds(draft.foodIds),
+        // The catalogue first, then anything the conversation had described for
+        // it. A described food is an input to the engine like any other.
+        foods: [
+          for (final id in draft.foodIds)
+            catalog.foodById(id) ?? described[id],
+        ].whereType<FoodItem>().toList(),
         goal: settings.goal,
         prefs: settings.dietPrefs,
         insight: ref.watch(historyInsightProvider),

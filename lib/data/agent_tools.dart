@@ -63,6 +63,15 @@ class AgentTools {
   /// ten seconds, so shown immediately they arrive above their own explanation.
   final void Function(List<Patch> options, {bool now})? onRecommendations;
 
+  /// Describes foods the catalogue does not contain, and puts them on the
+  /// plate. Returns the ids it managed to describe.
+  ///
+  /// Assigned by the app rather than passed in, because it is a network call
+  /// and the tools are deliberately free of providers. Unset, nothing changes:
+  /// an unknown food stays unknown and the agent asks about it, which is what
+  /// it did before this existed.
+  Future<List<String>> Function(List<String> names)? describe;
+
   /// Keeps the patch in the history.
   ///
   /// Assigned by the screen rather than passed in, because saving needs a
@@ -184,9 +193,9 @@ class AgentTools {
   Future<Object?> _run(ToolCall call) async {
     switch (call.name) {
       case 'set_meal':
-        return _setMeal(call.arguments);
+        return _setMealAsync(call.arguments);
       case 'add_foods':
-        return _addFoods(call.arguments);
+        return _addFoodsAsync(call.arguments);
       case 'get_recommendation':
         return _getRecommendation();
       case 'choose_patch':
@@ -200,7 +209,25 @@ class AgentTools {
     }
   }
 
-  Map<String, dynamic> _setMeal(Map<String, dynamic> args) {
+  /// Asks for a description of everything that did not match, and adds what
+  /// comes back to the plate.
+  ///
+  /// Best effort: if nothing can be described the unmatched list is unchanged
+  /// and the agent asks, exactly as before.
+  Future<List<String>> _describeUnmatched(List<String> unmatched) async {
+    final ask = describe;
+    if (ask == null || unmatched.isEmpty) return unmatched;
+
+    final ids = await ask(unmatched);
+    if (ids.isEmpty) return unmatched;
+
+    setFoods([...currentFoodIds(), ...ids]);
+    // Only the ones still unaccounted for are worth a question.
+    final left = unmatched.length - ids.length;
+    return left <= 0 ? const [] : unmatched.sublist(unmatched.length - left);
+  }
+
+  Future<Map<String, dynamic>> _setMealAsync(Map<String, dynamic> args) async {
     // The slot first: setting it clears the plate, so doing it after the foods
     // would throw them away.
     final slot = _slotFrom(args['meal']);
@@ -208,22 +235,24 @@ class AgentTools {
 
     final resolved = _resolve(args['foods'], slot);
     setFoods(resolved.ids);
-    _plateChanged(resolved.unmatched);
-    onMealChanged?.call(resolved.ids);
+    final unmatched = await _describeUnmatched(resolved.unmatched);
+    _plateChanged(unmatched);
+    onMealChanged?.call(currentFoodIds());
     return {
       'meal': slot.id,
       'matched': resolved.matched,
-      'unmatched': resolved.unmatched,
+      'unmatched': unmatched,
     };
   }
 
-  Map<String, dynamic> _addFoods(Map<String, dynamic> args) {
+  Future<Map<String, dynamic>> _addFoodsAsync(Map<String, dynamic> args) async {
     final slot = currentSlot();
     final resolved = _resolve(args['foods'], slot);
     setFoods([...currentFoodIds(), ...resolved.ids]);
-    _plateChanged(resolved.unmatched);
+    final unmatched = await _describeUnmatched(resolved.unmatched);
+    _plateChanged(unmatched);
     onMealChanged?.call(currentFoodIds());
-    return {'matched': resolved.matched, 'unmatched': resolved.unmatched};
+    return {'matched': resolved.matched, 'unmatched': unmatched};
   }
 
   /// The plate is not what it was, so nothing decided about the old one holds.
@@ -252,6 +281,21 @@ class AgentTools {
 
   Map<String, dynamic> _getRecommendation({bool force = false}) {
     if (currentFoodIds().isEmpty) {
+      // An empty plate because nothing was recognised is a different situation
+      // to an empty plate because nobody has said anything yet, and it needs a
+      // different question. Somebody said "pancakes" and got asked whether
+      // there was anything else on the plate *with* the pancakes — the app had
+      // no idea it had failed to understand the only word it was given.
+      if (_unresolved.isNotEmpty) {
+        final asking = _unresolved;
+        _unresolved = const [];
+        return {
+          'status': 'ask_first',
+          'unmatched': asking,
+          'message': 'Nothing on the plate was understood. Ask what these are '
+              'before recommending anything.',
+        };
+      }
       // Not an error. The agent should ask what is on the plate, not apologise.
       return {'status': 'no_food_yet', 'options': const []};
     }

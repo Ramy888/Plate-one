@@ -290,6 +290,44 @@ void main() {
     });
   });
 
+  group('a food the catalogue does not have', () {
+    test('is described and put on the plate, not interrogated', () async {
+      // This is what "pancakes" used to do: match nothing, leave the plate
+      // empty, and make the app ask what was in it. The person answered "flour,
+      // eggs and milk", which put eggs and milk on the plate — and then both
+      // the advice and the picture were about a meal nobody ate. Pancakes have
+      // a catalogue row now; injera stands in for the long tail that never
+      // will.
+      final tools = build()
+        ..describe = (names) async {
+          expect(names, contains('injera'));
+          return ['d:injera'];
+        };
+
+      final result = await call(tools, 'set_meal', {
+        'meal': 'lunch_dinner',
+        'foods': ['injera'],
+      });
+
+      expect(result['unmatched'], isEmpty,
+          reason: 'described, so there is nothing left to ask about');
+      expect(draft.foodIds, contains('d:injera'));
+    });
+
+    test('still asks when nothing can be described', () async {
+      // The describer is best effort. When it comes back empty the app behaves
+      // exactly as it did before it existed.
+      final tools = build()..describe = (names) async => const [];
+
+      final result = await call(tools, 'set_meal', {
+        'meal': 'breakfast',
+        'foods': ['zzzzz'],
+      });
+
+      expect(result['unmatched'], ['zzzzz']);
+    });
+  });
+
   group('a plate it did not understand', () {
     test('refuses to recommend until the unmatched foods are asked about', () async {
       // The failure this exists for: someone described injera, doro wat, kitfo

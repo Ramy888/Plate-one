@@ -5,6 +5,7 @@
 // names — never from anything the user typed.
 
 export const FOOD_NAMES: Readonly<Record<string, string>> = {
+  "avocado_food": "Avocado",
   "baladi_bread": "Baladi bread",
   "banana": "Banana",
   "beans": "Beans",
@@ -20,6 +21,7 @@ export const FOOD_NAMES: Readonly<Record<string, string>> = {
   "coffee_tea": "Coffee or tea",
   "cooked_veg": "Cooked vegetables",
   "crisps": "Crisps",
+  "croissant": "Croissant",
   "curry": "Curry",
   "dates": "Dates",
   "eggs": "Eggs",
@@ -36,6 +38,7 @@ export const FOOD_NAMES: Readonly<Record<string, string>> = {
   "nuts": "Nuts",
   "oats": "Oats",
   "paella": "Paella",
+  "pancakes": "Pancakes",
   "pasta": "Pasta",
   "pho": "Pho",
   "pizza": "Pizza",
@@ -52,6 +55,7 @@ export const FOOD_NAMES: Readonly<Record<string, string>> = {
   "sushi": "Sushi",
   "taameya": "Taameya or falafel",
   "tacos": "Tacos",
+  "tofu": "Tofu",
   "white_bread": "White bread",
   "white_rice": "Rice",
   "whole_grain_bread": "Whole-grain bread",
